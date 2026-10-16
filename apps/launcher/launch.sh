@@ -6,6 +6,9 @@ name="${1:?instance name}"
 [ -n "${APP_COMMAND:-}" ] || { echo "app '$name': command is required" >&2; sleep 10; exit 1; }
 cd "${APP_WORKDIR:-/opt/kiosk/apps/$name}" 2>/dev/null || cd /
 
+# windows that exist before the start; a new one is the fallback when pid/class find nothing
+BEFORE_WIDS="$(DISPLAY=:0 xdotool search --onlyvisible --name '' 2>/dev/null | sort | tr '\n' ' ')"
+export BEFORE_WIDS
 bash -c "$APP_COMMAND" &
 pid=$!
 # place the window in the background; the app keeps running even when no window is found

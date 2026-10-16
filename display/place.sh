@@ -21,11 +21,18 @@ case "$mode" in
     window)
         pid="${2:?pid}"; cls="${3:-}"; screen="${4:-primary}"; geom="${5:-fullscreen}"
         wid=""
+        # BEFORE_WIDS (optional, from the launcher): windows that existed before the start
         for _ in $(seq 1 30); do
             if [ -n "$cls" ]; then
                 wid="$(xdotool search --onlyvisible --class "$cls" 2>/dev/null | head -1)"
             else
                 wid="$(xdotool search --onlyvisible --pid "$pid" 2>/dev/null | head -1)"
+                if [ -z "$wid" ] && [ -n "${BEFORE_WIDS:-}" ]; then
+                    for cand in $(xdotool search --onlyvisible --name '' 2>/dev/null); do
+                        [[ " ${BEFORE_WIDS} " == *" $cand "* ]] && continue
+                        wid="$cand"; break
+                    done
+                fi
             fi
             [ -n "$wid" ] && break
             sleep 0.5
