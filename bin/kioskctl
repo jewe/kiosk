@@ -83,7 +83,7 @@ cmd_status() {
     echo "=== Kiosk $host ==="
     echo "version:      $ver"
     echo "uptime:       $up"
-    echo "persistence:  $mode (root overlay: $ov, /opt/kiosk: $(findmnt -n -o FSTYPE "$KIOSK_DIR" 2>/dev/null || echo "dir on root"))"
+    echo "persistence:  $mode (root overlay: $ov, /opt/kiosk: $(findmnt -n -o FSTYPE "$KIOSK_DIR" 2>/dev/null | tail -1 || echo "dir on root"))"
     echo "ip:           ${ip:-none}"
     echo "cpu temp:     ${temp:-n/a}"
     echo "session:      $session"
@@ -125,7 +125,8 @@ cmd_doctor() {
     done
     check "overlayroot installed"           "command -v overlayroot-chroot"
     if [ "$(persistence_mode)" = rw ]; then check "persistence rw: no overlay" "! overlayroot_active"; else check "persistence $(persistence_mode): overlay active" "overlayroot_active"; fi
-    [ "$(persistence_mode)" = locked ] && check "locked: /opt/kiosk overlaid" "[ \"\$(findmnt -n -o FSTYPE $KIOSK_DIR)\" = overlay ] || ! findmnt -n $KIOSK_DIR"
+    # findmnt lists stacked mounts bottom-up; the last line is the topmost (the overlay in locked mode)
+    [ "$(persistence_mode)" = locked ] && check "locked: /opt/kiosk overlaid" "[ \"\$(findmnt -n -o FSTYPE $KIOSK_DIR | tail -1)\" = overlay ] || ! findmnt -n $KIOSK_DIR"
     check "sshd running"                    "systemctl is-active ssh"
     check "ufw active"                      "ufw status | grep -q 'Status: active'"
     check "sensors available"               "sensors"
