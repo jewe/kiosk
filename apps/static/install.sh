@@ -14,5 +14,7 @@ systemctl enable nginx >/dev/null
 
 install -m 0644 "${KIOSK_SYS}/apps/static/kiosk-static@.service" /etc/systemd/system/
 install -m 0644 "${KIOSK_SYS}/apps/static/kiosk-content-update@.service" /etc/systemd/system/
+install -m 0644 "${KIOSK_SYS}/apps/static/kiosk-content-update@.timer" /etc/systemd/system/
+apt_install xdotool
 systemctl daemon-reload
 log "installed. Add an app of type 'static' to ${KIOSK_CONFIG} and run: sudo kioskctl apply"

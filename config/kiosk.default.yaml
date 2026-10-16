@@ -33,13 +33,20 @@ apps:
     screen: primary          # primary | all | output name
     geometry: fullscreen     # fullscreen | WxH+X+Y relative to the screen
     extra_flags: ""          # extra Chrome flags
-  # - name: site             # static site served by nginx on 127.0.0.1 (e.g. nuxt generate output)
+  # - name: menu             # static site served by nginx on 127.0.0.1 (e.g. nuxt generate output), see docs/nuxt-app.md
   #   type: static
-  #   path: /opt/kiosk/apps/site/site    # directory with index.html (when no repo)
-  #   repo: ""                           # optional git repo, cloned to /opt/kiosk/apps/site/repo
-  #   branch: main
-  #   subdir: .output/public             # directory inside the repo to serve
-  #   update_on_boot: false              # git pull at boot, restart the app when changed
+  #   path: /opt/kiosk/apps/menu/site    # directory with index.html (when no repo)
+  #   repo: git@github.com:you/menu-app.git   # app build; private repos: kioskctl secrets git-key
+  #   branch: build
+  #   subdir: ""                         # directory inside the repo to serve
+  #   data_repo: git@github.com:you/menu-data.git   # optional data repo served under data_url
+  #   data_branch: main
+  #   data_subdir: ""
+  #   data_url: /data
+  #   update_on_boot: true               # pull both repos at boot
+  #   update_interval: 15m               # and periodically (0 = off)
+  #   on_app_change: restart             # restart | reload | none
+  #   on_data_change: reload
   #   port: 8080
   #   screen: primary
 
