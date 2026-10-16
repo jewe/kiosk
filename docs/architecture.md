@@ -173,10 +173,8 @@ Kept: the split between the immutable git checkout and the mutable runtime direc
 
 Fixed: inconsistent install paths; the `runtime/start.sh` mode loop; the session unit hardcoding uid 1001 and `kiosk.target` never being wired in; `Requires=graphical.target` on a system without a display manager; the pinned nvidia 535 driver without a tearing fix; `kioskctl update` editing `overlayroot.conf` on a read-only root; non-idempotent modules; `chmod 0777 /opt`.
 
-## Implementation order
+## Implementation status (2026-10-16)
 
-1. B1 to B3 minimal: autoinstall in a VM, boot to openbox with one fullscreen Chrome.
-2. B4 config and B8 kioskctl.
-3. B5 app types.
-4. B6 services, B7 monitoring, B13 scheduler.
-5. B10 tests, B11 dev tools.
+Done and tested on kiosk-01: provisioning (autoinstall, bootstrap, setup), core OS, display stack, config and kioskctl, app types web/static/video/slideshow/launcher with per-screen placement, services tunnel/wifi/usb/audio/security, monitoring collector + heartbeat + PHP receiver, scheduler, stress test and benchmarks, dev tools and dev mode, branding.
+
+Not yet verified on a device: persistence modes (`kioskctl mount` incl. `overlayroot-chroot`), nvidia and AMD paths, touch mapping, WLAN join with real credentials, tunnel against a real server, USB action with a real stick, projector transform. See `open-questions.md`.
