@@ -55,10 +55,10 @@ if [ "$enabled" = "true" ] && [ "${#on_specs[@]}" -gt 0 ] && [ "${#off_specs[@]}
     write_timer off "${off_specs[@]}"
     {
         echo "[Unit]"; echo "Description=Kiosk schedule: apply current state after boot"
-        echo "After=kiosk-session.service"; echo "PartOf=kiosk.target"
-        echo; echo "[Service]"; echo "Type=oneshot"; echo "ExecStartPre=/bin/sleep 20"
+        echo "After=kiosk.target"
+        echo; echo "[Service]"; echo "Type=oneshot"; echo "TimeoutStartSec=120"; echo "ExecStartPre=/bin/sleep 20"
         echo "ExecStart=${KIOSK_SYS}/services/scheduler/action.sh sync"
-        echo; echo "[Install]"; echo "WantedBy=kiosk.target"
+        echo; echo "[Install]"; echo "WantedBy=multi-user.target"
     } | write_file "$units/kiosk-schedule-sync.service" || true
     systemctl daemon-reload
     systemctl enable --now kiosk-schedule-on.timer kiosk-schedule-off.timer >/dev/null 2>&1

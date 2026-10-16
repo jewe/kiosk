@@ -18,12 +18,9 @@ next_elapse() {
 
 do_on() {
     log "on ($off_action)"
-    case "$off_action" in
-        apps)   systemctl start kiosk.target ;;
-        *)      ;;
-    esac
+    # --no-block: this may run from inside a unit that kiosk.target itself waits for
+    systemctl start --no-block kiosk.target 2>/dev/null || true
     xk xset dpms force on 2>/dev/null; xk xset s reset 2>/dev/null
-    systemctl start kiosk.target 2>/dev/null || true
     echo on > "${KIOSK_STATE}/schedule"
 }
 do_off() {
