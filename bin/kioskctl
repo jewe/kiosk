@@ -47,8 +47,8 @@ render_app_env() {
     while read -r key; do
         [ -n "$key" ] || continue
         [[ "$key" =~ ^[a-z0-9_]+$ ]] || { warn "apps[$i]: key '$key' ignored (use a-z, 0-9, _)"; continue; }
-        case "$(yq -r ".apps[$i].${key} | tag" "$KIOSK_CONFIG")" in
-            '!!seq'|'!!map') continue ;;
+        case "$(yq -r ".apps[$i].${key} | type" "$KIOSK_CONFIG")" in
+            array|object) continue ;;
         esac
         val="$(cfg ".apps[$i].${key}")"
         val="${val//\\/\\\\}"; val="${val//\"/\\\"}"
@@ -261,12 +261,14 @@ cmd_mount() {
             sed -i "\#/var/log/journal#d" /etc/fstab
         fi
     ' _ "$ov" "$journal" "$KIOSK_DIR"
+    # record the mode in the config (sed keeps the comments; yq here is the python/jq one)
+    local sedexpr="/^persistence:/,/^[^ ]/{s/^(  mode:[ ]*)[^ #]+/\\1${mode}/}"
     if findmnt -n "$KIOSK_DIR" >/dev/null 2>&1; then
         mkdir -p "$KIOSK_DIR/logs/journal"
-        [ -f "$KIOSK_CONFIG" ] && yq -i ".persistence.mode = \"$mode\"" "$KIOSK_CONFIG"
+        [ -f "$KIOSK_CONFIG" ] && sed -i -E "$sedexpr" "$KIOSK_CONFIG"
     else
         # shellcheck disable=SC2016
-        run_on_real_root bash -c 'mkdir -p "$1/logs/journal"; [ -f "$2" ] && yq -i ".persistence.mode = \"$3\"" "$2"' _ "$KIOSK_DIR" "$KIOSK_CONFIG" "$mode"
+        run_on_real_root bash -c 'mkdir -p "$1/logs/journal"; [ -f "$2" ] && sed -i -E "$3" "$2"' _ "$KIOSK_DIR" "$KIOSK_CONFIG" "$sedexpr"
     fi
     log "persistence mode set to '$mode'. Reboot to activate."
 }

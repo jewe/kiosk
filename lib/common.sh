@@ -57,7 +57,8 @@ write_file() {
     return 0
 }
 
-# cfg <yq-expression> [default]   Reads a value from kiosk.yaml.
+# cfg <jq-expression> [default]   Reads a value from kiosk.yaml.
+# Note: Ubuntu's `yq` package is the Python wrapper around jq: jq syntax, no in-place edits.
 cfg() {
     local expr="$1" default="${2:-}" val
     [ -f "$KIOSK_CONFIG" ] || { printf '%s' "$default"; return; }
