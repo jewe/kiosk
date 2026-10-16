@@ -10,13 +10,14 @@ set -a; source "${KIOSK_STATE}/apps/${name}.env"; set +a
 
 repo="${KIOSK_DIR}/apps/${name}/repo"
 branch="${APP_BRANCH:-main}"
+# every git call runs as the kiosk user: the repo belongs to it and git refuses foreign owners
 git_as() { sudo -u "$KIOSK_USER" timeout 120 git "$@"; }
 
 if [ -d "$repo/.git" ]; then
-    before="$(git -C "$repo" rev-parse HEAD)"
+    before="$(git_as -C "$repo" rev-parse HEAD)"
     git_as -C "$repo" fetch -q --depth 1 origin "$branch"
     git_as -C "$repo" reset -q --hard FETCH_HEAD
-    after="$(git -C "$repo" rev-parse HEAD)"
+    after="$(git_as -C "$repo" rev-parse HEAD)"
     if [ "$before" != "$after" ]; then
         log "$name updated ${before:0:7} -> ${after:0:7}"
         systemctl try-restart "kiosk-static@${name}.service" || true
@@ -26,5 +27,5 @@ if [ -d "$repo/.git" ]; then
 else
     install -d -o "$KIOSK_USER" -g "$KIOSK_USER" "$(dirname "$repo")"
     git_as clone -q --depth 1 --branch "$branch" "$APP_REPO" "$repo"
-    log "$name cloned $(git -C "$repo" rev-parse --short HEAD)"
+    log "$name cloned $(git_as -C "$repo" rev-parse --short HEAD)"
 fi
