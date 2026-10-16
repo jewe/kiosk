@@ -89,6 +89,8 @@ cmd_status() {
     echo "ip:           ${ip:-none}"
     echo "cpu temp:     ${temp:-n/a}"
     echo "session:      $session"
+    echo "tunnel:       $(systemctl is-enabled kiosk-tunnel.service 2>/dev/null || echo off) / $(systemctl is-active kiosk-tunnel.service 2>/dev/null || true)"
+    echo "wifi:         $(nmcli -t -f NAME,DEVICE con show --active 2>/dev/null | grep '^kiosk-' | cut -d: -f1 | paste -sd' ' - || true)"
     echo "apps:"
     for a in "${apps[@]}"; do printf '  %-16s %s\n' "${a%%:*}" "${a#*:}"; done
     if x_running; then
@@ -164,6 +166,13 @@ cmd_apply() {
             for u in "${wanted[@]:-}"; do [ -n "$u" ] && systemctl restart "$u" || true; done
         fi
     fi
+
+    # --- services (each reads its own config section) ---
+    local svc
+    for svc in audio wifi tunnel usb security; do
+        [ -x "${KIOSK_SYS}/services/${svc}/apply.sh" ] || continue
+        "${KIOSK_SYS}/services/${svc}/apply.sh" || { warn "service '$svc' apply failed"; problems=1; }
+    done
 
     # --- persistence: only report, the switch is explicit ---
     local want_mode cur_mode

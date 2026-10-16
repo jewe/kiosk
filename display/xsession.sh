@@ -14,6 +14,8 @@ xsetroot -cursor_name left_ptr -solid black
 bg="$(cfg '.display.background' '')"
 [ -n "$bg" ] && [ -f "$bg" ] && feh --no-fehbg --bg-fill "$bg" || true
 
+/opt/kiosksystem/services/audio/apply.sh || true
+
 unclutter-xfixes --start-hidden --hide-on-touch --timeout 1 --fork >/dev/null 2>&1 || true
 
 exec openbox --config-file /opt/kiosksystem/display/openbox/rc.xml

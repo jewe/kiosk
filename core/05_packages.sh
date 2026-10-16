@@ -8,7 +8,7 @@ apt_install \
     yq jq curl wget ca-certificates gnupg \
     pciutils usbutils lm-sensors lvm2 \
     htop nano less \
-    network-manager \
+    network-manager autossh \
     pipewire pipewire-pulse wireplumber alsa-utils
 
 # NetworkManager handles WLAN later; keep netplan's ethernet config as is.

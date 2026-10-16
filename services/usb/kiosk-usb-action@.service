@@ -1,0 +1,8 @@
+[Unit]
+Description=Kiosk: USB stick action for /dev/%I
+After=kiosk.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/kiosksystem/services/usb/handler.sh %I
+TimeoutStartSec=300

@@ -1,0 +1,19 @@
+[Unit]
+Description=Kiosk: reverse SSH tunnel (autossh)
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+EnvironmentFile=/opt/kiosk/state/tunnel.env
+Environment=AUTOSSH_GATETIME=0
+ExecStart=/usr/bin/autossh -M 0 -N \
+    -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -o ExitOnForwardFailure=yes \
+    -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/opt/kiosk/secrets/tunnel/known_hosts \
+    -o IdentitiesOnly=yes -i /opt/kiosk/secrets/tunnel/id_ed25519 \
+    -p ${TUNNEL_PORT} -R ${TUNNEL_REMOTE_PORT}:127.0.0.1:22 ${TUNNEL_USER}@${TUNNEL_HOST}
+Restart=always
+RestartSec=15
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,2 @@
+# USB stick plugged in → kiosk-usb-action@<partition>.service
+ACTION=="add", SUBSYSTEM=="block", ENV{DEVTYPE}=="partition", ENV{ID_BUS}=="usb", TAG+="systemd", ENV{SYSTEMD_WANTS}+="kiosk-usb-action@%k.service"
