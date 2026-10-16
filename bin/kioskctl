@@ -60,7 +60,7 @@ render_app_env() {
 }
 
 # ---------- commands ----------
-cmd_version() { cat "${KIOSK_DIR}/VERSION" 2>/dev/null || echo unknown; }
+cmd_version() { git -C "$KIOSK_SYS" describe --always --dirty 2>/dev/null || cat "${KIOSK_DIR}/VERSION" 2>/dev/null || echo unknown; }
 
 cmd_status() {
     local json=0; [ "${1:-}" = "--json" ] && json=1
@@ -92,7 +92,7 @@ cmd_status() {
     echo "ip:           ${ip:-none}"
     echo "cpu temp:     ${temp:-n/a}"
     echo "session:      $session"
-    echo "tunnel:       $(systemctl is-enabled kiosk-tunnel.service 2>/dev/null || echo off) / $(systemctl is-active kiosk-tunnel.service 2>/dev/null || true)"
+    echo "tunnel:       $(systemctl is-enabled kiosk-tunnel.service 2>/dev/null || true) / $(systemctl is-active kiosk-tunnel.service 2>/dev/null || true)"
     echo "wifi:         $(nmcli -t -f NAME,DEVICE con show --active 2>/dev/null | grep '^kiosk-' | cut -d: -f1 | paste -sd' ' - || true)"
     echo "apps:"
     for a in "${apps[@]}"; do printf '  %-16s %s\n' "${a%%:*}" "${a#*:}"; done

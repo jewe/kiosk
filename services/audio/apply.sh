@@ -5,7 +5,8 @@ set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/common.sh"
 LOG_TAG="audio"
 uid="$(id -u "$KIOSK_USER" 2>/dev/null || echo 1001)"
-wp() { if [ "$(id -u)" -eq 0 ]; then sudo -u "$KIOSK_USER" env XDG_RUNTIME_DIR="/run/user/$uid" wpctl "$@"; else XDG_RUNTIME_DIR="/run/user/$uid" wpctl "$@"; fi; }
+# wpctl prints RTKit warnings on stderr when no rtkit daemon runs; they are harmless
+wp() { if [ "$(id -u)" -eq 0 ]; then sudo -u "$KIOSK_USER" env XDG_RUNTIME_DIR="/run/user/$uid" wpctl "$@" 2>/dev/null; else XDG_RUNTIME_DIR="/run/user/$uid" wpctl "$@" 2>/dev/null; fi; }
 command -v wpctl >/dev/null || { warn "wpctl missing"; exit 0; }
 wp status >/dev/null 2>&1 || { warn "pipewire not running for $KIOSK_USER"; exit 0; }
 
