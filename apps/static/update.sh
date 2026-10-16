@@ -39,7 +39,8 @@ reload_window() {
     local wid
     wid="$(sudo -u "$KIOSK_USER" env DISPLAY=:0 XAUTHORITY="/home/${KIOSK_USER}/.Xauthority" xdotool search --onlyvisible --class "kiosk-${name}" 2>/dev/null | head -1)"
     [ -n "$wid" ] || { warn "$name: no window to reload, restarting instead"; systemctl try-restart "kiosk-static@${name}.service"; return; }
-    sudo -u "$KIOSK_USER" env DISPLAY=:0 XAUTHORITY="/home/${KIOSK_USER}/.Xauthority" xdotool windowactivate --sync "$wid" key --clearmodifiers F5 2>/dev/null
+    # Ctrl+R sent to the window itself works in Chrome's kiosk mode; F5 via the focused window did not
+    sudo -u "$KIOSK_USER" env DISPLAY=:0 XAUTHORITY="/home/${KIOSK_USER}/.Xauthority" xdotool key --window "$wid" ctrl+r 2>/dev/null
 }
 act() {  # act <what> <action>
     case "$2" in

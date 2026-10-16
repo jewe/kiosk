@@ -17,3 +17,4 @@ Small items not yet decided. Each has a proposed default that will be used unles
 | 11 | Xorg under `PAMName=login` with `needs_root_rights=yes` | verified 2026-10-16 on kiosk-01 (Intel UHD 730, Ubuntu 26.04): boots to Chrome in 12 s | done |
 | 12 | Persistence modes on a device | verified 2026-10-16 on kiosk-01: data, data+journal (journal survives reboots), locked (root and /opt/kiosk volatile), rw; switching from inside an active overlay works | done |
 | 13 | Touch simulation: xdotool sends mouse events, not multitouch. Real touch events would need uinput (evemu/dotool) | mouse events are enough for browser apps | open |
+| 14 | Two-repo static app verified on kiosk-01 against private bare repos over SSH with the kiosk deploy key (GitHub itself not yet used from a device, needs the key added on github.com) | add the key printed by `kioskctl secrets git-key` as deploy key to both repos | partly |
