@@ -329,7 +329,8 @@ case "${1:-}" in
                   *) [ -f "${KIOSK_STATE}/devmode" ] && echo on || echo off; exit 0 ;;
               esac
               rc="${KIOSK_SYS}/display/openbox/rc.xml"; [ -f "${KIOSK_STATE}/devmode" ] && rc="${KIOSK_SYS}/display/openbox/rc-dev.xml"
-              x_running && sudo -u "$KIOSK_USER" env "${XENV[@]}" openbox --reconfigure >/dev/null 2>&1; sudo -u "$KIOSK_USER" env "${XENV[@]}" sh -c "openbox --config-file $rc --replace >/dev/null 2>&1 &" || true
+              ln -sfn "$rc" "${KIOSK_STATE}/openbox-rc.xml"; chown -h "$KIOSK_USER:$KIOSK_USER" "${KIOSK_STATE}/openbox-rc.xml"
+              x_running && sudo -u "$KIOSK_USER" env "${XENV[@]}" openbox --reconfigure >/dev/null 2>&1 || true
               log "devmode ${2}" ;;
     update)   cmd_update ;;
     version)  cmd_version ;;
