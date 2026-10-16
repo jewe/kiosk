@@ -18,4 +18,6 @@ bg="$(cfg '.display.background' '')"
 
 unclutter-xfixes --start-hidden --hide-on-touch --timeout 1 --fork >/dev/null 2>&1 || true
 
-exec openbox --config-file /opt/kiosksystem/display/openbox/rc.xml
+rc=/opt/kiosksystem/display/openbox/rc.xml
+[ -f "${KIOSK_STATE}/devmode" ] && rc=/opt/kiosksystem/display/openbox/rc-dev.xml && log "dev mode: escape hotkeys active"
+exec openbox --config-file "$rc"

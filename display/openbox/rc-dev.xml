@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Dev-mode openbox config: like rc.xml plus escape hotkeys. Enabled with `kioskctl devmode on`. -->
+<openbox_config xmlns="http://openbox.org/3.4/rc">
+  <focus><focusNew>yes</focusNew><followMouse>no</followMouse></focus>
+  <placement><policy>Smart</policy></placement>
+  <theme><keepBorder>no</keepBorder><titleLayout></titleLayout></theme>
+  <desktops><number>1</number></desktops>
+  <keyboard>
+    <keybind key="C-A-t"><action name="Execute"><command>sh -c 'command -v mate-terminal >/dev/null &amp;&amp; exec mate-terminal; exec x-terminal-emulator'</command></action></keybind>
+    <keybind key="C-A-f"><action name="Execute"><command>caja</command></action></keybind>
+    <keybind key="C-A-c"><action name="Execute"><command>code</command></action></keybind>
+    <keybind key="A-Tab"><action name="NextWindow"><finalactions><action name="Focus"/><action name="Raise"/></finalactions></action></keybind>
+    <keybind key="C-A-q"><action name="Close"/></keybind>
+  </keyboard>
+  <mouse>
+    <dragThreshold>8</dragThreshold>
+    <context name="Client"><mousebind button="Left" action="Press"><action name="Focus"/><action name="Raise"/></mousebind></context>
+    <context name="Frame">
+      <mousebind button="A-Left" action="Drag"><action name="Move"/></mousebind>
+      <mousebind button="A-Right" action="Drag"><action name="Resize"/></mousebind>
+    </context>
+  </mouse>
+  <applications><application class="*"><decor>no</decor><focus>yes</focus><skip_taskbar>yes</skip_taskbar></application></applications>
+</openbox_config>

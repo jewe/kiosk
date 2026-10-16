@@ -19,6 +19,9 @@ Usage: kioskctl <command>
   storage status|init [SIZE] persistent volume for /opt/kiosk (default 20G)
   mount <rw|locked|data|data+journal>   set persistence mode (reboot required)
   schedule on|off|sync       run a scheduler action now
+  test stress [min] [eps]    simulate usage, sample memory (tests/stress.sh)
+  bench info|gpu|motionmark  benchmarks (tests/bench.sh)
+  devmode on|off             escape hotkeys in the session (Ctrl+Alt+T terminal), reconfigures openbox
   update                     git pull system repo, re-run setup, re-apply
   version
 U
@@ -317,6 +320,17 @@ case "${1:-}" in
     storage)  shift; cmd_storage "$@" ;;
     mount)    shift; cmd_mount "$@" ;;
     schedule) require_root; "${KIOSK_SYS}/services/scheduler/action.sh" "${2:-sync}" ;;
+    test)     shift; case "${1:-}" in stress) shift; "${KIOSK_SYS}/tests/stress.sh" "$@" ;; *) usage; exit 1 ;; esac ;;
+    bench)    shift; "${KIOSK_SYS}/tests/bench.sh" "$@" ;;
+    devmode)  require_root
+              case "${2:-}" in
+                  on)  touch "${KIOSK_STATE}/devmode" ;;
+                  off) rm -f "${KIOSK_STATE}/devmode" ;;
+                  *) [ -f "${KIOSK_STATE}/devmode" ] && echo on || echo off; exit 0 ;;
+              esac
+              rc="${KIOSK_SYS}/display/openbox/rc.xml"; [ -f "${KIOSK_STATE}/devmode" ] && rc="${KIOSK_SYS}/display/openbox/rc-dev.xml"
+              x_running && sudo -u "$KIOSK_USER" env "${XENV[@]}" openbox --reconfigure >/dev/null 2>&1; sudo -u "$KIOSK_USER" env "${XENV[@]}" sh -c "openbox --config-file $rc --replace >/dev/null 2>&1 &" || true
+              log "devmode ${2}" ;;
     update)   cmd_update ;;
     version)  cmd_version ;;
     -h|--help|help|"") usage ;;
