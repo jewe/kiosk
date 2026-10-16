@@ -9,6 +9,9 @@ usage() {
 Usage: kioskctl <command>
 
   status [--json]            summary of this kiosk
+  history [N]                last N metric lines from the journal (default 20)
+  metrics                    collect metrics now (JSON)
+  heartbeat                  send a heartbeat now
   doctor                     check every component
   apply                      validate kiosk.yaml and apply apps, display, persistence config
   app list|start|stop|restart|logs|update [name]
@@ -99,6 +102,14 @@ cmd_status() {
     fi
 }
 
+cmd_history() {
+    local n="${1:-20}"
+    printf '%-25s %6s %6s %5s %5s %5s %6s %s\n' ts cpu gpu load mem% disk% fan restarts
+    journalctl -t kiosk-monitor -o cat --no-pager -n "$n" 2>/dev/null | jq -r \
+        '[.ts[0:19], (.cpu_temp // "-"), (.gpu_temp // "-"), (.load // "-"), (.mem_pct // "-"), (.disk_root // "-"), (.fan // "-"), (.restarts | to_entries | map(select(.value > 0) | "\(.key)=\(.value)") | join(" "))] | @tsv' \
+        | awk -F'\t' '{printf "%-25s %6s %6s %5s %5s %5s %6s %s\n", $1,$2,$3,$4,$5,$6,$7,$8}'
+}
+
 cmd_doctor() {
     local ok=0 bad=0
     check() { if eval "$2" >/dev/null 2>&1; then echo "  ok    $1"; ok=$((ok+1)); else echo "  FAIL  $1"; bad=$((bad+1)); fi; }
@@ -120,6 +131,7 @@ cmd_doctor() {
     check "sshd running"                    "systemctl is-active ssh"
     check "ufw active"                      "ufw status | grep -q 'Status: active'"
     check "sensors available"               "sensors"
+    check "monitor timer enabled"           "systemctl is-enabled kiosk-monitor.timer"
     echo "  $ok ok, $bad failed"
     [ "$bad" -eq 0 ]
 }
@@ -173,6 +185,7 @@ cmd_apply() {
         [ -x "${KIOSK_SYS}/services/${svc}/apply.sh" ] || continue
         "${KIOSK_SYS}/services/${svc}/apply.sh" || { warn "service '$svc' apply failed"; problems=1; }
     done
+    "${KIOSK_SYS}/monitoring/apply.sh" || { warn "monitoring apply failed"; problems=1; }
 
     # --- persistence: only report, the switch is explicit ---
     local want_mode cur_mode
@@ -292,6 +305,9 @@ cmd_update() {
 
 case "${1:-}" in
     status)   shift; cmd_status "$@" ;;
+    history)  shift; cmd_history "$@" ;;
+    metrics)  "${KIOSK_SYS}/monitoring/collect.sh" ;;
+    heartbeat) require_root; "${KIOSK_SYS}/monitoring/heartbeat.sh" ;;
     doctor)   cmd_doctor ;;
     apply)    cmd_apply ;;
     app)      shift; cmd_app "$@" ;;

@@ -1,0 +1,7 @@
+[Unit]
+Description=Kiosk: collect metrics into the journal and send the heartbeat
+
+[Service]
+Type=oneshot
+ExecStart=/opt/kiosksystem/monitoring/collect.sh --log
+ExecStart=/opt/kiosksystem/monitoring/heartbeat.sh

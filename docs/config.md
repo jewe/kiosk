@@ -18,7 +18,8 @@ Apply with `sudo kioskctl apply`. Unknown keys are ignored. Everything has a def
 | `network.wifi[]` | up to three service WLAN names in priority order; `WIFI_<NAME>_SSID` / `WIFI_<NAME>_PSK` in `secrets/wifi.env` |
 | `services.tunnel` | `enabled`, `host`, `port` (22), `user` (tunnel), `remote_port` (20022). Key in `secrets/tunnel/`, public key printed by apply |
 | `services.usb_action` | `enabled`; action script `/opt/kiosk/usb-action.sh` |
-| `services.monitoring`, `services.scheduler` | (planned) |
+| `services.monitoring` | `enabled` (heartbeat), `url`, `interval` (5m, also the local metrics interval). Token in `secrets/monitoring.env` |
+| `services.scheduler` | (planned) |
 | `schedule` | per-weekday `on`/`off` times (planned) |
 | `security.disable_usb_storage` | blacklist usb-storage; refused while `usb_action` is enabled |
 | `persistence.mode` | `rw`, `locked`, `data`, `data+journal`; activated with `sudo kioskctl mount <mode>` + reboot |
