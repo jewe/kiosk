@@ -82,14 +82,19 @@ real_root() {
     else return 1; fi
 }
 
-# run_on_real_root <cmd...>  Runs a command with the real root as /, remounted rw for the duration.
+# run_on_real_root <cmd...>  Runs a command with the real root as /, writable for the duration.
+# /dev /proc /sys /run /boot /boot/efi are bind-mounted so that update-grub works inside.
 run_on_real_root() {
-    local rr rc=0
+    local rr rc=0 was_ro=0 m
     if overlayroot_active; then
         rr="$(real_root)" || die "overlay active but the lower root is not mounted"
-        mount -o remount,rw "$rr"
+        if findmnt -n -o OPTIONS "$rr" | grep -q '^ro,\|,ro,\|,ro$\|^ro$'; then was_ro=1; mount -o remount,rw "$rr"; fi
+        for m in /dev /proc /sys /run /boot /boot/efi; do
+            [ -d "$m" ] && mountpoint -q "$m" && mkdir -p "$rr$m" && mount --bind "$m" "$rr$m"
+        done
         chroot "$rr" "$@" || rc=$?
-        sync; mount -o remount,ro "$rr" 2>/dev/null || true
+        for m in /boot/efi /boot /run /sys /proc /dev; do umount -l "$rr$m" 2>/dev/null || true; done
+        sync; [ "$was_ro" = 1 ] && mount -o remount,ro "$rr" 2>/dev/null || true
         return $rc
     else
         "$@"

@@ -290,17 +290,17 @@ cmd_mount() {
             sed -i "\#/var/log/journal#d" /etc/fstab
         fi
         install -m 0644 /opt/kiosksystem/services/persistence/kiosk-locked.service /etc/systemd/system/
+        mkdir -p /etc/systemd/system/local-fs.target.wants
         if [ "$lock" = 1 ]; then ln -sfn /etc/systemd/system/kiosk-locked.service /etc/systemd/system/local-fs.target.wants/kiosk-locked.service
         else rm -f /etc/systemd/system/local-fs.target.wants/kiosk-locked.service; fi
         [ -f "$cfgf" ] && [ ! -h "$cfgf" ] && sed -i -E "$sedexpr" "$cfgf" || true
+        update-grub >/dev/null 2>&1 || echo "WARNING: update-grub failed" >&2
     '
     local sedexpr="/^persistence:/,/^[^ ]/{s/^(  mode:[ ]*)[^ #]+/\\1${mode}/}"
     mkdir -p "$KIOSK_DIR/logs/journal" 2>/dev/null || true
+    # update-grub must run on the real root (grub-probe cannot handle an overlay root)
     run_on_real_root bash -c "$script" _ "$mode" "$overlay" "$journal" "$lock" "$KIOSK_DIR" "$KIOSK_CONFIG" "$sedexpr"
-    if overlayroot_active; then
-        bash -c "$script" _ "$mode" "$overlay" "$journal" "$lock" "$KIOSK_DIR" "$KIOSK_CONFIG" "$sedexpr"
-    fi
-    update-grub >/dev/null 2>&1 || warn "update-grub failed"
+    overlayroot_active && echo "$mode" > /etc/kiosk-persistence
     # initramfs-tools systems read /etc/overlayroot.conf at boot; dracut systems use the kernel command line
     log "persistence mode set to '$mode'. Reboot to activate."
 }
