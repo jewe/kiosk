@@ -11,12 +11,20 @@ name="${1:?name}"
 set -a; source "${KIOSK_STATE}/apps/${name}.env"; set +a
 appdir="${KIOSK_DIR}/apps/${name}"
 
-gitkey="${KIOSK_SECRETS}/git/id_ed25519"
-if [ -f "$gitkey" ]; then
-    export GIT_SSH_COMMAND="ssh -i $gitkey -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=${KIOSK_SECRETS}/git/known_hosts -o BatchMode=yes"
-else
+# GitHub allows a deploy key on one repository only, so each repo may have its own key:
+#   secrets/git/<app>-app, secrets/git/<app>-data (kioskctl secrets git-key <label>), fallback secrets/git/id_ed25519
+gitkey=""
+use_key() {  # use_key <label>
+    local k
+    for k in "${KIOSK_SECRETS}/git/$1" "${KIOSK_SECRETS}/git/id_ed25519"; do
+        if [ -f "$k" ]; then
+            gitkey="$k"
+            export GIT_SSH_COMMAND="ssh -i $k -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=${KIOSK_SECRETS}/git/known_hosts -o BatchMode=yes"
+            return
+        fi
+    done
     export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes"
-fi
+}
 # runs as root (content dirs are root-owned, world-readable for nginx)
 g() { timeout 120 git -c safe.directory='*' "$@"; }
 
@@ -53,14 +61,16 @@ act() {  # act <what> <action>
 
 rc=0
 if [ -n "${APP_REPO:-}" ]; then
-    r="$(sync_repo "$APP_REPO" "${APP_BRANCH:-main}" "$appdir/repo")"; log "$name app: $r"
+    use_key "${name}-app"
+    r="$(sync_repo "$APP_REPO" "${APP_BRANCH:-main}" "$appdir/repo")"; log "$name app: $r (key: ${gitkey:-none})"
     case "$r" in changed*) act app "${APP_ON_APP_CHANGE:-restart}" ;; failed) rc=1 ;; esac
 fi
 if [ -n "${APP_DATA_REPO:-}" ]; then
-    r="$(sync_repo "$APP_DATA_REPO" "${APP_DATA_BRANCH:-main}" "$appdir/data")"; log "$name data: $r"
+    use_key "${name}-data"
+    r="$(sync_repo "$APP_DATA_REPO" "${APP_DATA_BRANCH:-main}" "$appdir/data")"; log "$name data: $r (key: ${gitkey:-none})"
     case "$r" in changed*) act data "${APP_ON_DATA_CHANGE:-reload}" ;; failed) rc=1 ;; esac
 fi
-if [ "$rc" = 1 ] && [ ! -f "$gitkey" ] && [[ "${APP_REPO:-}${APP_DATA_REPO:-}" == *"git@"* || "${APP_REPO:-}${APP_DATA_REPO:-}" == *"ssh://"* ]]; then
-    warn "ssh repo without deploy key: run 'kioskctl secrets git-key' and add the key to the repos"
+if [ "$rc" = 1 ] && [[ "${APP_REPO:-}${APP_DATA_REPO:-}" == *"git@"* || "${APP_REPO:-}${APP_DATA_REPO:-}" == *"ssh://"* ]]; then
+    warn "ssh clone failed: generate keys with 'kioskctl secrets git-key ${name}-app' / '${name}-data' and add them as deploy keys"
 fi
 exit $rc

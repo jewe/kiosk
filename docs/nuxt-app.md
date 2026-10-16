@@ -47,7 +47,15 @@ apps:
     port: 8080
 ```
 
-Private repos: on the kiosk run `sudo kioskctl secrets git-key`, add the printed key as a **read-only deploy key** to both repos (GitHub: repo → Settings → Deploy keys). Then `sudo kioskctl apply`. `kioskctl app update menu` pulls immediately, `kioskctl app logs menu` and `journalctl -u kiosk-content-update@menu` show what happened.
+Private repos: GitHub accepts a deploy key on **one** repository only, so the kiosk uses one key per repo, named after the app and its role:
+
+```sh
+sudo kioskctl secrets git-key menu-app     # add to the app repo:  Settings → Deploy keys (read-only)
+sudo kioskctl secrets git-key menu-data    # add to the data repo
+sudo kioskctl apply
+```
+
+With the GitHub CLI on your machine: `gh repo deploy-key add key.pub -R you/menu-app -t kiosk-01`. For a fleet, a machine user with read access to both repos and one key per kiosk in that user's SSH keys avoids two keys per device; then `kioskctl secrets git-key` without a label is the shared fallback key. `kioskctl app update menu` pulls immediately, `kioskctl app logs menu` and `journalctl -u kiosk-content-update@menu` show what happened.
 
 Persistence: content pulled while the kiosk runs in `locked` mode lives in RAM and is pulled again after a reboot. Devices whose content changes should run in `data` mode (`sudo kioskctl mount data`), where `/opt/kiosk` persists.
 

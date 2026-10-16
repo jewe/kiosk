@@ -22,7 +22,8 @@ Usage: kioskctl <command>
   test stress [min] [eps]    simulate usage, sample memory (tests/stress.sh)
   bench info|gpu|motionmark  benchmarks (tests/bench.sh)
   devmode on|off             escape hotkeys in the session (Ctrl+Alt+T terminal), reconfigures openbox
-  secrets git-key|tunnel-key generate/show the kiosk's deploy key for private repos / the tunnel key
+  secrets git-key [label]    generate/show a deploy key for a private repo (label e.g. menu-app, menu-data)
+  secrets tunnel-key|list    show the tunnel key / list all public keys
   update                     git pull system repo, re-run setup, re-apply
   version
 U
@@ -342,11 +343,15 @@ case "${1:-}" in
     secrets)  require_root
               case "${2:-}" in
                   git-key)
-                      d="${KIOSK_SECRETS}/git"; install -d -m 0700 "$d"
-                      [ -f "$d/id_ed25519" ] || { ssh-keygen -q -t ed25519 -N "" -C "kiosk-$(hostname)-git" -f "$d/id_ed25519"; touch "$d/known_hosts"; log "git deploy key generated"; }
-                      echo "Add this as a read-only deploy key to the app and data repos:"; cat "$d/id_ed25519.pub" ;;
+                      # git-key [label]: GitHub accepts a deploy key on one repo only, so use one key per repo,
+                      # labelled <app>-app and <app>-data; without label the shared fallback key id_ed25519.
+                      d="${KIOSK_SECRETS}/git"; install -d -m 0700 "$d"; touch "$d/known_hosts"
+                      k="${3:-id_ed25519}"; [[ "$k" =~ ^[a-z0-9_-]+$ ]] || die "label must be [a-z0-9_-]"
+                      [ -f "$d/$k" ] || { ssh-keygen -q -t ed25519 -N "" -C "kiosk-$(hostname)-$k" -f "$d/$k"; log "git deploy key '$k' generated"; }
+                      echo "Add this as a read-only deploy key to the repo:"; cat "$d/$k.pub" ;;
+                  list) ls -1 "${KIOSK_SECRETS}/git/"*.pub "${KIOSK_SECRETS}/tunnel/"*.pub 2>/dev/null || echo "no keys" ;;
                   tunnel-key) cat "${KIOSK_SECRETS}/tunnel/id_ed25519.pub" 2>/dev/null || die "no tunnel key yet (enable services.tunnel and apply)" ;;
-                  *) echo "usage: kioskctl secrets git-key|tunnel-key"; exit 1 ;;
+                  *) echo "usage: kioskctl secrets git-key [label]|tunnel-key|list"; exit 1 ;;
               esac ;;
     update)   cmd_update ;;
     version)  cmd_version ;;
