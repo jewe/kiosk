@@ -13,7 +13,7 @@ Small items not yet decided. Each has a proposed default that will be used unles
 | 7 | Which Chrome policies beyond extensions (no updates, no password manager, no first-run, no translate) | all of those on | open |
 | 8 | USB-stick action: fixed script on the device, or script shipped on the stick? | Fixed script on the device (`/opt/kiosk/usb-action.sh`); default writes a status report to the stick | done |
 | 9 | Scheduler off-action | `services.scheduler.off_action`: screen (default), apps, shutdown (rtcwake) | done |
-| 10 | Verify on a device: `overlayroot-chroot <command>` runs the given command (used by `kioskctl mount` while locked) | if not, `kioskctl mount` must pipe a script into `overlayroot-chroot` | verify |
+| 10 | overlayroot on dracut-based Ubuntu | `/etc/overlayroot.conf` is ignored; kioskctl uses `rd.overlay` on the kernel command line and its own chroot into `/run/rootfsbase` | done |
 | 11 | Xorg under `PAMName=login` with `needs_root_rights=yes` | verified 2026-10-16 on kiosk-01 (Intel UHD 730, Ubuntu 26.04): boots to Chrome in 12 s | done |
 | 12 | Verify on a device: persistence modes locked / data / data+journal (`kioskctl mount`), including the journal bind mount | run on kiosk-01 before the first production device | verify |
 | 13 | Touch simulation: xdotool sends mouse events, not multitouch. Real touch events would need uinput (evemu/dotool) | mouse events are enough for browser apps | open |

@@ -1,0 +1,14 @@
+[Unit]
+Description=Kiosk: volatile tmpfs overlay over /opt/kiosk (persistence mode "locked")
+DefaultDependencies=no
+RequiresMountsFor=/opt/kiosk /run
+After=opt-kiosk.mount local-fs-pre.target
+Before=local-fs.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/opt/kiosksystem/services/persistence/lock-data.sh
+
+[Install]
+WantedBy=local-fs.target

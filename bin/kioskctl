@@ -32,16 +32,7 @@ XENV=(DISPLAY=:0 XAUTHORITY="/home/${KIOSK_USER}/.Xauthority")
 # ---------- helpers ----------
 app_names() { yq -r '.apps[]?.name' "$KIOSK_CONFIG" 2>/dev/null || true; }
 app_unit()  { local n="$1" t; t="$(yq -r ".apps[] | select(.name==\"$n\") | .type" "$KIOSK_CONFIG")"; echo "kiosk-${t}@${n}.service"; }
-persistence_mode() {
-    local ov
-    ov="$(grep -o 'overlayroot="[^"]*"' /etc/overlayroot.conf 2>/dev/null | cut -d'"' -f2 || true)"
-    case "$ov" in
-        "") echo rw ;;
-        tmpfs) echo locked ;;
-        tmpfs:recurse=0*) if [ -f /etc/systemd/journald.conf.d/20-kiosk-persistent.conf ]; then echo "data+journal"; else echo data; fi ;;
-        *) echo "custom($ov)" ;;
-    esac
-}
+persistence_mode() { cat /etc/kiosk-persistence 2>/dev/null || echo rw; }
 x_running() { env "${XENV[@]}" xset q >/dev/null 2>&1; }
 as_kiosk_x() { sudo -u "$KIOSK_USER" env "${XENV[@]}" "$@"; }
 
@@ -92,7 +83,7 @@ cmd_status() {
     echo "=== Kiosk $host ==="
     echo "version:      $ver"
     echo "uptime:       $up"
-    echo "persistence:  $mode (overlay active: $ov)"
+    echo "persistence:  $mode (root overlay: $ov, /opt/kiosk: $(findmnt -n -o FSTYPE "$KIOSK_DIR" 2>/dev/null || echo "dir on root"))"
     echo "ip:           ${ip:-none}"
     echo "cpu temp:     ${temp:-n/a}"
     echo "session:      $session"
@@ -133,6 +124,8 @@ cmd_doctor() {
         check "app '$n' active"                       "systemctl is-active $u"
     done
     check "overlayroot installed"           "command -v overlayroot-chroot"
+    if [ "$(persistence_mode)" = rw ]; then check "persistence rw: no overlay" "! overlayroot_active"; else check "persistence $(persistence_mode): overlay active" "overlayroot_active"; fi
+    [ "$(persistence_mode)" = locked ] && check "locked: /opt/kiosk overlaid" "[ \"\$(findmnt -n -o FSTYPE $KIOSK_DIR)\" = overlay ] || ! findmnt -n $KIOSK_DIR"
     check "sshd running"                    "systemctl is-active ssh"
     check "ufw active"                      "ufw status | grep -q 'Status: active'"
     check "sensors available"               "sensors"
@@ -260,26 +253,35 @@ cmd_storage() {
 
 cmd_mount() {
     require_root
-    local mode="${1:-}" ov journal=0
+    local mode="${1:-}" overlay=0 journal=0 lock=0
     case "$mode" in
-        rw)            ov='overlayroot=""' ;;
-        locked)        ov='overlayroot="tmpfs"' ;;
-        data)          ov='overlayroot="tmpfs:recurse=0"' ;;
-        data+journal)  ov='overlayroot="tmpfs:recurse=0"'; journal=1 ;;
+        rw)            ;;
+        locked)        overlay=1; lock=1 ;;
+        data)          overlay=1 ;;
+        data+journal)  overlay=1; journal=1 ;;
         *) usage; exit 1 ;;
     esac
-    if [ "$mode" != rw ] && [ "$mode" != locked ] && ! findmnt -n "$KIOSK_DIR" >/dev/null 2>&1; then
+    if [ "$journal" = 1 ] && ! findmnt -n "$KIOSK_DIR" >/dev/null 2>&1; then
         die "mode '$mode' needs a persistent volume at $KIOSK_DIR; run: sudo kioskctl storage init"
     fi
-    # /etc lives on the real root: go through overlayroot-chroot when the overlay is active.
-    # /opt/kiosk is either on its own volume (data modes: write directly) or part of the
-    # overlaid root (locked mode: write through the chroot as well).
+    [ "$mode" = data ] && ! findmnt -n "$KIOSK_DIR" >/dev/null 2>&1 && warn "no volume at $KIOSK_DIR: 'data' behaves like 'locked' (everything is on the overlaid root)"
+
+    # Written to the real root (through the chroot while an overlay is active) and, for update-grub,
+    # also to the live system. /boot is a separate partition, so update-grub works live.
+    local script
     # shellcheck disable=SC2016
-    run_on_real_root bash -c '
+    script='
         set -e
-        ov="$1"; journal="$2"; kdir="$3"
-        echo "$ov" > /etc/overlayroot.conf
-        mkdir -p /etc/systemd/journald.conf.d
+        mode="$1"; overlay="$2"; journal="$3"; lock="$4"; kdir="$5"; cfgf="$6"; sedexpr="$7"
+        echo "$mode" > /etc/kiosk-persistence
+        mkdir -p /etc/default/grub.d /etc/systemd/journald.conf.d
+        if [ "$overlay" = 1 ]; then
+            echo "overlayroot=\"tmpfs\"" > /etc/overlayroot.conf
+            echo "GRUB_CMDLINE_LINUX_DEFAULT=\"\$GRUB_CMDLINE_LINUX_DEFAULT rd.overlay\"" > /etc/default/grub.d/90-kiosk-overlay.cfg
+        else
+            echo "overlayroot=\"\"" > /etc/overlayroot.conf
+            rm -f /etc/default/grub.d/90-kiosk-overlay.cfg
+        fi
         if [ "$journal" = 1 ]; then
             printf "[Journal]\nStorage=persistent\n" > /etc/systemd/journald.conf.d/20-kiosk-persistent.conf
             grep -q "/var/log/journal" /etc/fstab || echo "$kdir/logs/journal /var/log/journal none bind 0 0" >> /etc/fstab
@@ -287,22 +289,25 @@ cmd_mount() {
             rm -f /etc/systemd/journald.conf.d/20-kiosk-persistent.conf
             sed -i "\#/var/log/journal#d" /etc/fstab
         fi
-    ' _ "$ov" "$journal" "$KIOSK_DIR"
-    # record the mode in the config (sed keeps the comments; yq here is the python/jq one)
+        install -m 0644 /opt/kiosksystem/services/persistence/kiosk-locked.service /etc/systemd/system/
+        if [ "$lock" = 1 ]; then ln -sfn /etc/systemd/system/kiosk-locked.service /etc/systemd/system/local-fs.target.wants/kiosk-locked.service
+        else rm -f /etc/systemd/system/local-fs.target.wants/kiosk-locked.service; fi
+        [ -f "$cfgf" ] && [ ! -h "$cfgf" ] && sed -i -E "$sedexpr" "$cfgf" || true
+    '
     local sedexpr="/^persistence:/,/^[^ ]/{s/^(  mode:[ ]*)[^ #]+/\\1${mode}/}"
-    if findmnt -n "$KIOSK_DIR" >/dev/null 2>&1; then
-        mkdir -p "$KIOSK_DIR/logs/journal"
-        [ -f "$KIOSK_CONFIG" ] && sed -i -E "$sedexpr" "$KIOSK_CONFIG"
-    else
-        # shellcheck disable=SC2016
-        run_on_real_root bash -c 'mkdir -p "$1/logs/journal"; [ -f "$2" ] && sed -i -E "$3" "$2"' _ "$KIOSK_DIR" "$KIOSK_CONFIG" "$sedexpr"
+    mkdir -p "$KIOSK_DIR/logs/journal" 2>/dev/null || true
+    run_on_real_root bash -c "$script" _ "$mode" "$overlay" "$journal" "$lock" "$KIOSK_DIR" "$KIOSK_CONFIG" "$sedexpr"
+    if overlayroot_active; then
+        bash -c "$script" _ "$mode" "$overlay" "$journal" "$lock" "$KIOSK_DIR" "$KIOSK_CONFIG" "$sedexpr"
     fi
+    update-grub >/dev/null 2>&1 || warn "update-grub failed"
+    # initramfs-tools systems read /etc/overlayroot.conf at boot; dracut systems use the kernel command line
     log "persistence mode set to '$mode'. Reboot to activate."
 }
 
 cmd_update() {
     require_root
-    overlayroot_active && die "system is locked; run 'kioskctl mount rw' and reboot first"
+    overlayroot_active && die "root is overlaid (mode $(persistence_mode)); run 'kioskctl mount rw' and reboot first"
     git -C "$KIOSK_SYS" pull --ff-only
     "${KIOSK_SYS}/setup.sh"
     log "update done; reboot recommended"

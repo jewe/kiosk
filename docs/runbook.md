@@ -39,7 +39,7 @@ sudo kioskctl storage init      # creates the kiosk-data LV from free VG space
 | session log | `journalctl -u kiosk-session -b` |
 | re-apply screens live | `sudo kioskctl display` |
 | unlock for changes | `sudo kioskctl mount rw`, reboot; afterwards `sudo kioskctl mount locked`, reboot |
-| small change while locked | `sudo overlayroot-chroot`, edit, exit |
+| small change while locked | `sudo mount -o remount,rw /run/rootfsbase && sudo chroot /run/rootfsbase`, edit, exit, `sudo mount -o remount,ro /run/rootfsbase` |
 | update system scripts | `sudo kioskctl update` (needs rw) |
 
 ## Troubleshooting

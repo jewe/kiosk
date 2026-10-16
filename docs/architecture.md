@@ -58,11 +58,11 @@ Secrets live outside the config in `/opt/kiosk/secrets/` (root, mode 0700, on th
 
 The read-only overlay has two purposes: every boot starts from the identical system (no cache or state drift), and SSD writes stay minimal for a long lifetime. How much is allowed to persist is a config choice, `persistence.mode`, and maps directly onto the overlayroot setting:
 
-| Mode | overlayroot | What persists | Use |
+| Mode | root overlay | What persists | Use |
 |---|---|---|---|
-| `locked` | `tmpfs` (recurse on) | nothing, `/opt/kiosk` is overlaid too | production default, identical start every day, near-zero writes |
-| `data` | `tmpfs:recurse=0` | the `/opt/kiosk` volume: config, secrets, app repo, bench results; journal stays in RAM | devices whose content is updated remotely |
-| `data+journal` | `tmpfs:recurse=0` + journal bind-mount | as `data`, plus `/var/log/journal` on the volume, high `SyncIntervalSec` | when long-term local history is wanted |
+| `locked` | on, plus a tmpfs overlay over `/opt/kiosk` (`kiosk-locked.service`) | nothing | production default, identical start every day, near-zero writes |
+| `data` | on | the `/opt/kiosk` volume: config, secrets, app repo, bench results; journal stays in RAM | devices whose content is updated remotely |
+| `data+journal` | on, journal bind-mount | as `data`, plus `/var/log/journal` on the volume, high `SyncIntervalSec` | when long-term local history is wanted |
 | `rw` (dev) | off | everything | development |
 
 Rules that hold in every mode:
@@ -77,7 +77,7 @@ Rules that hold in every mode:
 2. Else, if the disk has unpartitioned space, create a partition the same way.
 3. Else refuse and explain that root must be shrunk offline.
 
-`kioskctl mount locked|data|data+journal|rw` writes the overlayroot config and the journald drop-in and asks for a reboot. Small in-place changes in a locked system use `overlayroot-chroot`.
+`kioskctl mount locked|data|data+journal|rw` records the mode in `/etc/kiosk-persistence`, sets the kernel option `rd.overlay` through a GRUB drop-in (Ubuntu builds its initramfs with dracut since 25.10; `/etc/overlayroot.conf` is kept for initramfs-tools systems), writes the journald drop-in and asks for a reboot. While the overlay is active, all of this is written through a chroot into the read-only lower root at `/run/rootfsbase`, which is what `kioskctl` uses instead of `overlayroot-chroot`.
 
 ### D6. Updates
 

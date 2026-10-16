@@ -70,15 +70,27 @@ cfg() {
     fi
 }
 
+# The root overlay (dracut: rd.overlay, initramfs-tools: overlayroot) makes / an overlay filesystem.
 overlayroot_active() {
-    grep -qs ' /media/root-ro ' /proc/mounts
+    [ "$(findmnt -n -o FSTYPE / 2>/dev/null)" = "overlay" ]
 }
 
-# run_on_real_root <cmd...>  Runs a command on the real root filesystem,
-# through overlayroot-chroot when the overlay is active.
+# real_root  → mount point of the read-only lower root while the overlay is active
+real_root() {
+    if findmnt -n /run/rootfsbase >/dev/null 2>&1; then echo /run/rootfsbase      # dracut
+    elif findmnt -n /media/root-ro >/dev/null 2>&1; then echo /media/root-ro      # initramfs-tools
+    else return 1; fi
+}
+
+# run_on_real_root <cmd...>  Runs a command with the real root as /, remounted rw for the duration.
 run_on_real_root() {
+    local rr rc=0
     if overlayroot_active; then
-        overlayroot-chroot "$@"
+        rr="$(real_root)" || die "overlay active but the lower root is not mounted"
+        mount -o remount,rw "$rr"
+        chroot "$rr" "$@" || rc=$?
+        sync; mount -o remount,ro "$rr" 2>/dev/null || true
+        return $rc
     else
         "$@"
     fi
