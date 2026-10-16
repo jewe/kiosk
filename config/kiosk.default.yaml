@@ -1,0 +1,69 @@
+# Kiosk configuration. Copied to /opt/kiosk/config/kiosk.yaml by setup.sh.
+# Apply changes with:  sudo kioskctl apply
+# Reference: docs/config.md
+
+device:
+  id: ""                     # empty = hostname
+
+display:
+  background: /opt/kiosksystem/branding/backgrounds/black.jpg
+  outputs: []                # empty = xrandr --auto. Example:
+  # - name: HDMI-1
+  #   primary: true
+  #   mode: 1920x1080
+  #   pos: 0x0
+  #   rotate: normal         # normal|left|right|inverted
+  # - name: DP-1
+  #   pos: 1920x0
+  # - name: HDMI-2
+  #   enabled: false
+  #   transform: "1,0,0,0,1,0,0,0,1"   # optional 3x3 keystone matrix (xrandr --transform)
+
+touch:
+  output: ""                 # map the touchscreen to this output name, e.g. HDMI-1
+
+audio:
+  sink: ""                   # empty = default sink
+  volume: 70
+
+apps:
+  - name: main
+    type: web
+    url: https://example.org
+    screen: primary          # primary | all | output name
+    geometry: fullscreen     # fullscreen | WxH+X+Y relative to the screen
+    extra_flags: ""          # extra Chrome flags
+
+network:
+  wifi: []                   # up to 3 names; credentials in /opt/kiosk/secrets/wifi.env
+
+services:
+  tunnel:
+    enabled: false
+    host: ""
+    port: 22
+    user: tunnel
+    remote_port: 20022
+  app_update:
+    enabled: false
+    repo: ""
+    branch: main
+    path: /opt/kiosk/apps/content
+  usb_action:
+    enabled: false
+  monitoring:
+    enabled: false
+    url: ""
+    interval: 5m
+  scheduler:
+    enabled: false
+
+schedule: {}
+  # mon-fri: { on: "07:30", off: "19:00" }
+  # sat:     { on: "09:00", off: "16:00" }
+
+security:
+  disable_usb_storage: false
+
+persistence:
+  mode: rw                   # rw | locked | data | data+journal   (applied with: sudo kioskctl mount <mode>)

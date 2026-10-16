@@ -1,0 +1,4 @@
+autoinstall/out/
+*.img
+*.dmg
+.DS_Store

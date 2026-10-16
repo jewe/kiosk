@@ -1,0 +1,55 @@
+#cloud-config
+# Ubuntu Server 24.04 autoinstall for the kiosk. Rendered by make-cidata.sh.
+# Placeholders: __HOSTNAME__ __USERNAME__ __PASSWORD_HASH__ __SSH_KEY__ __REPO_URL__ __LOCALE__ __KEYBOARD__ __TIMEZONE__ __ROOT_SIZE__ __DATA_SIZE__
+autoinstall:
+  version: 1
+  locale: __LOCALE__
+  keyboard:
+    layout: __KEYBOARD__
+  timezone: __TIMEZONE__
+  refresh-installer:
+    update: false
+  source:
+    id: ubuntu-server-minimal
+    search_drivers: false
+  identity:
+    hostname: __HOSTNAME__
+    username: __USERNAME__
+    password: "__PASSWORD_HASH__"
+  ssh:
+    install-server: true
+    allow-pw: false
+    authorized-keys:
+      - "__SSH_KEY__"
+  packages:
+    - git
+    - lvm2
+    - curl
+  snaps: []
+  updates: security
+  storage:
+    # GPT with bios_grub + EFI so the same stick works on BIOS and UEFI machines.
+    # LVM: root and kiosk-data (/opt/kiosk) sizes from make-cidata.sh, the rest stays free in the VG.
+    swap:
+      size: 0
+    config:
+      - {type: disk, id: disk0, match: {size: largest}, ptable: gpt, wipe: superblock-recursive, preserve: false, grub_device: true}
+      - {type: partition, id: part-bios, device: disk0, size: 1M, flag: bios_grub, preserve: false}
+      - {type: partition, id: part-efi, device: disk0, size: 1G, flag: boot, grub_device: true, preserve: false}
+      - {type: format, id: fs-efi, volume: part-efi, fstype: fat32, preserve: false}
+      - {type: mount, id: mount-efi, device: fs-efi, path: /boot/efi}
+      - {type: partition, id: part-boot, device: disk0, size: 2G, preserve: false}
+      - {type: format, id: fs-boot, volume: part-boot, fstype: ext4, preserve: false}
+      - {type: mount, id: mount-boot, device: fs-boot, path: /boot}
+      - {type: partition, id: part-lvm, device: disk0, size: -1, preserve: false}
+      - {type: lvm_volgroup, id: vg0, name: vg0, devices: [part-lvm], preserve: false}
+      - {type: lvm_partition, id: lv-root, volgroup: vg0, name: root, size: __ROOT_SIZE__, preserve: false}
+      - {type: format, id: fs-root, volume: lv-root, fstype: ext4, preserve: false}
+      - {type: mount, id: mount-root, device: fs-root, path: /}
+      - {type: lvm_partition, id: lv-data, volgroup: vg0, name: kiosk-data, size: __DATA_SIZE__, preserve: false}
+      - {type: format, id: fs-data, volume: lv-data, fstype: ext4, label: kiosk-data, preserve: false}
+      - {type: mount, id: mount-data, device: fs-data, path: /opt/kiosk, options: "defaults,noatime"}
+  late-commands:
+    - curtin in-target --target=/target -- bash -c 'git clone __REPO_URL__ /opt/kiosksystem || echo "clone of __REPO_URL__ failed during install; run bootstrap.sh" > /root/KIOSK-CLONE-FAILED'
+    - curtin in-target --target=/target -- bash -c 'echo "__USERNAME__ ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/90-kioskadmin && chmod 440 /etc/sudoers.d/90-kioskadmin'
+    - curtin in-target --target=/target -- bash -c 'sed -i "s/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT=\"quiet splash loglevel=3\"/; s/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=1/" /etc/default/grub && update-grub'

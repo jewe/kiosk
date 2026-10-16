@@ -1,0 +1,21 @@
+{
+  "DefaultBrowserSettingEnabled": false,
+  "PasswordManagerEnabled": false,
+  "TranslateEnabled": false,
+  "MetricsReportingEnabled": false,
+  "BrowserSignin": 0,
+  "SyncDisabled": true,
+  "PromotionalTabsEnabled": false,
+  "BackgroundModeEnabled": false,
+  "AutofillAddressEnabled": false,
+  "AutofillCreditCardEnabled": false,
+  "SearchSuggestEnabled": false,
+  "SpellcheckEnabled": false,
+  "AudioSandboxEnabled": true,
+  "HardwareAccelerationModeEnabled": true,
+  "ShowHomeButton": false,
+  "BrowserAddPersonEnabled": false,
+  "BrowserGuestModeEnabled": false,
+  "DeveloperToolsAvailability": 2,
+  "ComponentUpdatesEnabled": false
+}

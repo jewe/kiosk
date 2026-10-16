@@ -1,0 +1,7 @@
+[Unit]
+Description=Kiosk: X session and all enabled apps
+Requires=kiosk-session.service
+After=kiosk-session.service
+
+[Install]
+WantedBy=multi-user.target

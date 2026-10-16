@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Minimal openbox config for the kiosk: no decorations, no key bindings, no desktop switching. -->
+<openbox_config xmlns="http://openbox.org/3.4/rc">
+  <focus>
+    <focusNew>yes</focusNew>
+    <followMouse>no</followMouse>
+  </focus>
+  <placement><policy>Smart</policy></placement>
+  <theme>
+    <keepBorder>no</keepBorder>
+    <titleLayout></titleLayout>
+  </theme>
+  <desktops><number>1</number></desktops>
+  <keyboard></keyboard>
+  <mouse>
+    <dragThreshold>8</dragThreshold>
+    <context name="Frame"></context>
+    <context name="Client">
+      <mousebind button="Left" action="Press"><action name="Focus"/></mousebind>
+    </context>
+  </mouse>
+  <applications>
+    <application class="*">
+      <decor>no</decor>
+      <focus>yes</focus>
+      <skip_taskbar>yes</skip_taskbar>
+    </application>
+  </applications>
+</openbox_config>

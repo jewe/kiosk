@@ -1,0 +1,29 @@
+[Unit]
+Description=Kiosk X session (Xorg + openbox) on tty1
+After=systemd-user-sessions.service plymouth-quit-wait.service systemd-logind.service
+Conflicts=getty@tty1.service
+Wants=kiosk.target
+
+[Service]
+User=kiosk
+Group=kiosk
+PAMName=login
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+StandardInput=tty
+StandardOutput=journal
+StandardError=journal
+UtmpIdentifier=tty1
+WorkingDirectory=/home/kiosk
+Environment=XDG_SESSION_TYPE=x11
+Environment=XDG_RUNTIME_DIR=/run/user/%U
+ExecStartPre=/bin/rm -f /home/kiosk/.Xauthority
+ExecStart=/usr/bin/startx /opt/kiosksystem/display/xsession.sh -- /usr/bin/X :0 vt1 -nolisten tcp -nocursor -keeptty -quiet
+Restart=always
+RestartSec=3
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target
