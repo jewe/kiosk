@@ -33,6 +33,15 @@ apps:
     screen: primary          # primary | all | output name
     geometry: fullscreen     # fullscreen | WxH+X+Y relative to the screen
     extra_flags: ""          # extra Chrome flags
+  # - name: site             # static site served by nginx on 127.0.0.1 (e.g. nuxt generate output)
+  #   type: static
+  #   path: /opt/kiosk/apps/site/site    # directory with index.html (when no repo)
+  #   repo: ""                           # optional git repo, cloned to /opt/kiosk/apps/site/repo
+  #   branch: main
+  #   subdir: .output/public             # directory inside the repo to serve
+  #   update_on_boot: false              # git pull at boot, restart the app when changed
+  #   port: 8080
+  #   screen: primary
 
 network:
   wifi: []                   # up to 3 names; credentials in /opt/kiosk/secrets/wifi.env

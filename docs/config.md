@@ -9,7 +9,9 @@ Apply with `sudo kioskctl apply`. Unknown keys are ignored. Everything has a def
 | `display.outputs[]` | xrandr settings per output: `name`, `primary`, `mode`, `pos` (`XxY`), `rotate`, `rate`, `enabled`, `transform` (9 comma-separated matrix values). Empty list = `xrandr --auto` |
 | `touch.output` | output name the touchscreen is mapped to |
 | `audio.sink`, `audio.volume` | PipeWire default sink and volume in percent (planned) |
-| `apps[]` | app instances: `name` ([a-z0-9_-]), `type` (web, …), `screen` (`primary`, `all`, output name), `geometry` (`fullscreen` or `WxH+X+Y` relative to the screen), type-specific keys (`url`, `path`, `extra_flags`) |
+| `apps[]` | app instances: `name` ([a-z0-9_-]), `type`, `screen` (`primary`, `all`, output name), `geometry` (`fullscreen` or `WxH+X+Y` relative to the screen), plus type-specific keys. Every scalar key is passed to the app as `APP_<KEY>` |
+| type `web` | `url`, `extra_flags` (Chrome flags) |
+| type `static` | `path` (directory to serve) or `repo` + `branch` + `subdir` (git clone into `/opt/kiosk/apps/<name>/repo`), `update_on_boot`, `port` (127.0.0.1 only, default 8080), `extra_flags`. SPA fallback to index.html is on |
 | `network.wifi[]` | up to three service WLAN names; credentials in `secrets/wifi.env` (planned) |
 | `services.*` | each optional service with `enabled` and its settings (tunnel, app_update, usb_action, monitoring, scheduler) (planned) |
 | `schedule` | per-weekday `on`/`off` times (planned) |

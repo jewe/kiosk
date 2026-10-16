@@ -1,0 +1,12 @@
+[Unit]
+Description=Kiosk: update content of static app %i from git
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/kiosksystem/apps/static/update.sh %i
+TimeoutStartSec=180
+
+[Install]
+WantedBy=multi-user.target

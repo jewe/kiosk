@@ -19,8 +19,13 @@ if [ "$geom" != "fullscreen" ] && [[ "$geom" =~ ^([0-9]+)x([0-9]+)\+([0-9]+)\+([
     x=$(( x + BASH_REMATCH[3] )); y=$(( y + BASH_REMATCH[4] ))
 fi
 
+# --kiosk always fills the whole monitor; a partial geometry uses app mode with a fixed window
+if [ "$geom" = "fullscreen" ]; then
+    mode=(--kiosk "${APP_URL:-about:blank}")
+else
+    mode=(--app="${APP_URL:-about:blank}")
+fi
 flags=(
-    --kiosk
     --user-data-dir="$profile"
     --window-position="${x},${y}"
     --window-size="${w},${h}"
@@ -40,4 +45,4 @@ flags=(
 # shellcheck disable=SC2206
 [ -n "${APP_EXTRA_FLAGS:-}" ] && flags+=(${APP_EXTRA_FLAGS})
 
-exec google-chrome-stable "${flags[@]}" "${APP_URL:-about:blank}"
+exec google-chrome-stable "${flags[@]}" "${mode[@]}"

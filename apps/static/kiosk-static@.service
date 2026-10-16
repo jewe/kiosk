@@ -1,0 +1,26 @@
+[Unit]
+Description=Kiosk static site app: %i
+PartOf=kiosk.target
+BindsTo=kiosk-session.service
+After=kiosk-session.service nginx.service
+Requires=nginx.service
+
+[Service]
+User=kiosk
+Group=kiosk
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/kiosk/.Xauthority
+Environment=XDG_RUNTIME_DIR=/run/user/%U
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/%U/bus
+EnvironmentFile=/opt/kiosk/state/apps/%i.env
+RuntimeDirectory=kiosk/%i
+RuntimeDirectoryMode=0700
+ExecStartPre=/opt/kiosksystem/display/wait-for-x.sh
+ExecStart=/opt/kiosksystem/apps/static/launch.sh %i
+Restart=always
+RestartSec=2
+KillMode=mixed
+TimeoutStopSec=10
+
+[Install]
+WantedBy=kiosk.target

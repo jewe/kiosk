@@ -11,7 +11,7 @@ Usage: kioskctl <command>
   status [--json]            summary of this kiosk
   doctor                     check every component
   apply                      validate kiosk.yaml and apply apps, display, persistence config
-  app list|start|stop|restart|logs [name]
+  app list|start|stop|restart|logs|update [name]
   display                    re-apply screen layout and touch mapping now
   storage status|init [SIZE] persistent volume for /opt/kiosk (default 20G)
   mount <rw|locked|data|data+journal>   set persistence mode (reboot required)
@@ -37,6 +37,24 @@ persistence_mode() {
 }
 x_running() { env "${XENV[@]}" xset q >/dev/null 2>&1; }
 as_kiosk_x() { sudo -u "$KIOSK_USER" env "${XENV[@]}" "$@"; }
+
+# render_app_env <index>   Prints APP_<KEY>=value for every scalar key of apps[index],
+# plus defaults for screen and geometry. Lists and maps are skipped.
+render_app_env() {
+    local i="$1" key val
+    echo "APP_SCREEN=primary"
+    echo "APP_GEOMETRY=fullscreen"
+    while read -r key; do
+        [ -n "$key" ] || continue
+        [[ "$key" =~ ^[a-z0-9_]+$ ]] || { warn "apps[$i]: key '$key' ignored (use a-z, 0-9, _)"; continue; }
+        case "$(yq -r ".apps[$i].${key} | tag" "$KIOSK_CONFIG")" in
+            '!!seq'|'!!map') continue ;;
+        esac
+        val="$(cfg ".apps[$i].${key}")"
+        val="${val//\\/\\\\}"; val="${val//\"/\\\"}"
+        echo "APP_${key^^}=\"${val}\""
+    done < <(yq -r ".apps[$i] | keys | .[]" "$KIOSK_CONFIG")
+}
 
 # ---------- commands ----------
 cmd_version() { cat "${KIOSK_DIR}/VERSION" 2>/dev/null || echo unknown; }
@@ -120,15 +138,10 @@ cmd_apply() {
         if [ ! -f "/etc/systemd/system/kiosk-${t}@.service" ]; then
             warn "app '$n': type '$t' is not installed, run: sudo ${KIOSK_SYS}/apps/${t}/install.sh"; problems=1; continue
         fi
-        {
-            echo "APP_NAME=$n"
-            echo "APP_TYPE=$t"
-            echo "APP_URL=$(cfg ".apps[$i].url")"
-            echo "APP_PATH=$(cfg ".apps[$i].path")"
-            echo "APP_SCREEN=$(cfg ".apps[$i].screen" primary)"
-            echo "APP_GEOMETRY=$(cfg ".apps[$i].geometry" fullscreen)"
-            echo "APP_EXTRA_FLAGS=$(cfg ".apps[$i].extra_flags")"
-        } | write_file "${KIOSK_STATE}/apps/${n}.env" 0644 || true
+        render_app_env "$i" | write_file "${KIOSK_STATE}/apps/${n}.env" 0644 || true
+        if [ -x "${KIOSK_SYS}/apps/${t}/render.sh" ]; then
+            "${KIOSK_SYS}/apps/${t}/render.sh" "$n" || { warn "render hook of '$n' failed"; problems=1; }
+        fi
         wanted+=("kiosk-${t}@${n}.service")
         systemctl enable "kiosk-${t}@${n}.service" >/dev/null 2>&1 || true
     done
@@ -138,8 +151,10 @@ cmd_apply() {
         [[ " ${wanted[*]:-} " == *" $u "* ]] && continue
         log "removing app instance $u"
         systemctl disable --now "$u" >/dev/null 2>&1 || true
-        n="${u#*@}"; rm -f "${KIOSK_STATE}/apps/${n%.service}.env"
-    done < <(systemctl list-units --all 'kiosk-*@*.service' --no-legend --plain 2>/dev/null)
+        n="${u#*@}"; n="${n%.service}"; t="${u#kiosk-}"; t="${t%%@*}"
+        [ -x "${KIOSK_SYS}/apps/${t}/remove.sh" ] && "${KIOSK_SYS}/apps/${t}/remove.sh" "$n" || true
+        rm -f "${KIOSK_STATE}/apps/${n}.env"
+    done < <(systemctl list-units --all 'kiosk-*@*.service' --no-legend --plain 2>/dev/null | grep -v 'kiosk-content-update@')
     systemctl daemon-reload
 
     # --- display: live re-apply when X is up, restart apps ---
@@ -161,11 +176,15 @@ cmd_apply() {
 }
 
 cmd_app() {
-    local sub="${1:-list}" n="${2:-}" x
+    local sub="${1:-list}" n="${2:-}" x t
     case "$sub" in
         list) for x in $(app_names); do printf '%-16s %-28s %s\n' "$x" "$(app_unit "$x")" "$(systemctl is-active "$(app_unit "$x")" 2>/dev/null || true)"; done ;;
         start|stop|restart) [ -n "$n" ] || die "app name required"; systemctl "$sub" "$(app_unit "$n")" ;;
         logs) [ -n "$n" ] || die "app name required"; journalctl -u "$(app_unit "$n")" -n 100 --no-pager ;;
+        update) require_root; [ -n "$n" ] || die "app name required"
+                t="$(yq -r ".apps[] | select(.name==\"$n\") | .type" "$KIOSK_CONFIG")"
+                [ -x "${KIOSK_SYS}/apps/${t}/update.sh" ] || die "app type '$t' has no update"
+                "${KIOSK_SYS}/apps/${t}/update.sh" "$n" ;;
         *) usage; exit 1 ;;
     esac
 }
