@@ -8,4 +8,5 @@
 - `usb/`: udev rule + unit running `/opt/kiosk/usb-action.sh <mountpoint> <device>` when a stick is plugged in (`services.usb_action`). Default action writes a status report to the stick.
 - `audio/`: default sink and volume via wpctl (`audio`), applied at every session start.
 - `security/`: usb-storage blacklist (`security.disable_usb_storage`).
-- Each has an `apply.sh` run by `kioskctl apply`. Later: monitor timer, scheduler timers.
+- `scheduler/`: `schedule` → systemd timers `kiosk-schedule-on/off`, actions screen/apps/shutdown, state sync after boot.
+- Each has an `apply.sh` run by `kioskctl apply`.

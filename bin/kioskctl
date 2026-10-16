@@ -18,6 +18,7 @@ Usage: kioskctl <command>
   display                    re-apply screen layout and touch mapping now
   storage status|init [SIZE] persistent volume for /opt/kiosk (default 20G)
   mount <rw|locked|data|data+journal>   set persistence mode (reboot required)
+  schedule on|off|sync       run a scheduler action now
   update                     git pull system repo, re-run setup, re-apply
   version
 U
@@ -93,6 +94,7 @@ cmd_status() {
     echo "cpu temp:     ${temp:-n/a}"
     echo "session:      $session"
     echo "tunnel:       $(systemctl is-enabled kiosk-tunnel.service 2>/dev/null || true) / $(systemctl is-active kiosk-tunnel.service 2>/dev/null || true)"
+    echo "schedule:     $([ -f "${KIOSK_STATE}/schedule" ] && cat "${KIOSK_STATE}/schedule" || echo off), next: $(systemctl list-timers --no-legend --no-pager 'kiosk-schedule-*' 2>/dev/null | awk '{print $1" "$2" "$3" "$NF}' | sed 's/.service//' | head -2 | paste -sd';' -)"
     echo "wifi:         $(nmcli -t -f NAME,DEVICE con show --active 2>/dev/null | grep '^kiosk-' | cut -d: -f1 | paste -sd' ' - || true)"
     echo "apps:"
     for a in "${apps[@]}"; do printf '  %-16s %s\n' "${a%%:*}" "${a#*:}"; done
@@ -181,7 +183,7 @@ cmd_apply() {
 
     # --- services (each reads its own config section) ---
     local svc
-    for svc in audio wifi tunnel usb security; do
+    for svc in audio wifi tunnel usb security scheduler; do
         [ -x "${KIOSK_SYS}/services/${svc}/apply.sh" ] || continue
         "${KIOSK_SYS}/services/${svc}/apply.sh" || { warn "service '$svc' apply failed"; problems=1; }
     done
@@ -314,6 +316,7 @@ case "${1:-}" in
     display)  cmd_display ;;
     storage)  shift; cmd_storage "$@" ;;
     mount)    shift; cmd_mount "$@" ;;
+    schedule) require_root; "${KIOSK_SYS}/services/scheduler/action.sh" "${2:-sync}" ;;
     update)   cmd_update ;;
     version)  cmd_version ;;
     -h|--help|help|"") usage ;;

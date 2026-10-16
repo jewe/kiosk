@@ -20,7 +20,7 @@ disk_root="$(df --output=pcent / | tail -1 | tr -dc '0-9')"
 disk_data="$(df --output=pcent "$KIOSK_DIR" 2>/dev/null | tail -1 | tr -dc '0-9')"
 uptime_s="$(cut -d. -f1 /proc/uptime)"
 restarts="$(for u in $(systemctl list-units --plain --no-legend 'kiosk-*@*.service' 2>/dev/null | awk '{print $1}'); do
-    printf '"%s":%s,' "${u#kiosk-}" "$(systemctl show -p NRestarts --value "$u" 2>/dev/null || echo 0)"; done)"
+    k="${u#kiosk-}"; printf '"%s":%s,' "${k%.service}" "$(systemctl show -p NRestarts --value "$u" 2>/dev/null || echo 0)"; done)"
 restarts="{${restarts%,}}"
 session="$(systemctl is-active kiosk-session.service 2>/dev/null)"
 
@@ -30,7 +30,8 @@ line="$(jq -c -n \
     --argjson fan "$(num "$fan")" --argjson throttle "$(num "$throttle")" --argjson load "$(num "$load")" \
     --argjson mem_pct "$(num "$mem_pct")" --argjson disk_root "$(num "$disk_root")" --argjson disk_data "$(num "$disk_data")" \
     --argjson uptime "$(num "$uptime_s")" --argjson restarts "$restarts" \
-    '{ts:$ts,host:$host,cpu_temp:$cpu_temp,gpu_temp:$gpu_temp,gpu_util:$gpu_util,fan:$fan,throttle:$throttle,load:$load,mem_pct:$mem_pct,disk_root:$disk_root,disk_data:$disk_data,uptime:$uptime,session:$session,restarts:$restarts}')"
+    'def r1: if . == null then null else (. * 10 | round / 10) end;
+     {ts:$ts,host:$host,cpu_temp:($cpu_temp|r1),gpu_temp:($gpu_temp|r1),gpu_util:$gpu_util,fan:$fan,throttle:$throttle,load:$load,mem_pct:$mem_pct,disk_root:$disk_root,disk_data:$disk_data,uptime:$uptime,session:$session,restarts:$restarts}')"
 
 if [ "${1:-}" = "--log" ]; then
     logger -t kiosk-monitor -- "$line"
