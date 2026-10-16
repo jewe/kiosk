@@ -22,7 +22,9 @@ Chosen over Wayland (cage, as in kiosk26) because every hard requirement has a k
 
 The session layer (`display/`) is kept thin so a Wayland session can be added later for Intel-only devices.
 
-### D2. Base OS: Ubuntu Server 24.04 LTS, installed unattended
+### D2. Base OS: Ubuntu Server LTS, installed unattended
+
+Written for 24.04; the first device was installed with 26.04.1 LTS and everything in milestone 1 worked there, so 26.04 is the current target.
 
 Server, not Ubuntu MATE: only what we install is on the box. MATE helpers such as caja are an optional dev-tools module.
 
