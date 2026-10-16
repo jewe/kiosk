@@ -10,6 +10,7 @@ Group=kiosk
 Environment=DISPLAY=:0
 Environment=XAUTHORITY=/home/kiosk/.Xauthority
 Environment=XDG_RUNTIME_DIR=/run/user/%U
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/%U/bus
 EnvironmentFile=/opt/kiosk/state/apps/%i.env
 RuntimeDirectory=kiosk/%i
 RuntimeDirectoryMode=0700

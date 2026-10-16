@@ -10,6 +10,11 @@ export XAUTHORITY="${XAUTHORITY:-/home/${KIOSK_USER}/.Xauthority}"
 n="$(cfg '.display.outputs | length' 0)"
 if [ "$n" = "0" ]; then
     xrandr --auto
+    # X may mark a disconnected output as primary; make the first connected one primary
+    first="$(xrandr --query | awk '$2=="connected" {print $1; exit}')"
+    if [ -n "$first" ] && ! xrandr --query | grep -q ' connected primary '; then
+        xrandr --output "$first" --primary && log "primary output: $first"
+    fi
 else
     args=()
     for ((i=0; i<n; i++)); do

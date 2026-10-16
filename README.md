@@ -1,6 +1,6 @@
 # Kiosk
 
-Scripts and documentation to turn a bare x86 PC into a long-running Linux kiosk: Ubuntu Server 24.04, Xorg + openbox, several apps placed per screen, touch, nvidia-safe, read-only root in production, monitored, remote-manageable over SSH.
+Scripts and documentation to turn a bare x86 PC into a long-running Linux kiosk: Ubuntu Server LTS (tested with 26.04.1, written for 24.04), Xorg + openbox, several apps placed per screen, touch, nvidia-safe, read-only root in production, monitored, remote-manageable over SSH.
 
 Status: first milestone implemented (autoinstall, base setup, X11 session, web app type, kioskctl), untested on hardware. See `docs/architecture.md` for the decisions and `docs/open-questions.md` for what is still open.
 
