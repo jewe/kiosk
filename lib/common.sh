@@ -83,6 +83,15 @@ run_on_real_root() {
     fi
 }
 
+# has_gpu intel|amd|nvidia   Matches on the PCI vendor id of display controllers,
+# not on names ("Corporation" contains "ati").
 has_gpu() {
-    lspci 2>/dev/null | grep -i 'vga\|3d\|display' | grep -qi "$1"
+    local vid
+    case "$1" in
+        intel)  vid=8086 ;;
+        amd)    vid=1002 ;;
+        nvidia) vid=10de ;;
+        *) return 1 ;;
+    esac
+    lspci -nn 2>/dev/null | grep -i 'vga\|3d\|display' | grep -q "\[${vid}:"
 }

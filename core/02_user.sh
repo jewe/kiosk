@@ -22,8 +22,9 @@ chmod 0700 "$KIOSK_SECRETS"
 
 ln -sfn "${KIOSK_SYS}/bin/kioskctl" /usr/local/bin/kioskctl
 
-# the kiosk user may read status and restart its own apps, nothing else
+# the kiosk user may read status, nothing else (sudo forbids wildcards in arguments)
 write_file /etc/sudoers.d/90-kiosk 0440 <<SUDO || true
-$KIOSK_USER ALL=(root) NOPASSWD: /usr/local/bin/kioskctl status*, /usr/local/bin/kioskctl app *
+$KIOSK_USER ALL=(root) NOPASSWD: /usr/local/bin/kioskctl status, /usr/local/bin/kioskctl status --json, /usr/local/bin/kioskctl doctor, /usr/local/bin/kioskctl app list
 SUDO
+visudo -cf /etc/sudoers.d/90-kiosk >/dev/null || { rm -f /etc/sudoers.d/90-kiosk; warn "sudoers rule invalid, removed"; }
 log "done"

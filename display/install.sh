@@ -29,7 +29,7 @@ if has_gpu nvidia; then
         ubuntu-drivers install || warn "nvidia driver install failed; check 'ubuntu-drivers devices'"
     fi
     install -m 0644 "${KIOSK_SYS}/display/xorg.conf.d/20-kiosk-nvidia.conf" /etc/X11/xorg.conf.d/
-elif has_gpu 'amd\|ati\|radeon'; then
+elif has_gpu amd; then
     log "AMD GPU detected"
     install -m 0644 "${KIOSK_SYS}/display/xorg.conf.d/20-kiosk-amdgpu.conf" /etc/X11/xorg.conf.d/
 elif has_gpu intel; then
