@@ -6,18 +6,9 @@ set -euo pipefail
 name="${1:?instance name}"
 profile="${RUNTIME_DIRECTORY:-/run/kiosk/$name}"   # tmpfs: a fresh profile at every start
 
-w=""; h=""; x=0; y=0
-read -r w h x y < <(/opt/kiosksystem/display/screen-geometry.sh "${APP_SCREEN:-primary}") || true
-if [ -z "$w" ] || [ -z "$h" ]; then
-    echo "screen '${APP_SCREEN:-primary}' not found, falling back to 1920x1080+0+0" >&2
-    w=1920; h=1080; x=0; y=0
-fi
-
 geom="${APP_GEOMETRY:-fullscreen}"
-if [ "$geom" != "fullscreen" ] && [[ "$geom" =~ ^([0-9]+)x([0-9]+)\+([0-9]+)\+([0-9]+)$ ]]; then
-    w="${BASH_REMATCH[1]}"; h="${BASH_REMATCH[2]}"
-    x=$(( x + BASH_REMATCH[3] )); y=$(( y + BASH_REMATCH[4] ))
-fi
+read -r w h x y < <(/opt/kiosksystem/display/place.sh geometry "${APP_SCREEN:-primary}" "$geom") || true
+[ -n "${w:-}" ] || { w=1920; h=1080; x=0; y=0; }
 
 # --kiosk always fills the whole monitor; a partial geometry uses app mode with a fixed window
 if [ "$geom" = "fullscreen" ]; then
