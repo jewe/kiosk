@@ -2,7 +2,7 @@
 # re-exec with bash when started with sh
 [ -n "${BASH_VERSION:-}" ] || exec bash "$0" "$@"
 # Benchmarks. Results go to /opt/kiosk/data/bench/ and the journal (tag kiosk-bench).
-#   bench.sh gpu          glmark2 (windowed, ~2 min)
+#   bench.sh gpu          glmark2 (fullscreen, about 8 minutes)
 #   bench.sh motionmark   opens MotionMark in a Chrome window for 5 minutes; read the score on screen
 #   bench.sh info         GPU, driver, video decode capabilities
 set -uo pipefail
@@ -24,7 +24,7 @@ case "$what" in
         } | tee "$out/info-$ts.txt" ;;
     gpu)
         command -v glmark2 >/dev/null || apt_install glmark2
-        log "glmark2 running (about 2 minutes)"
+        log "glmark2 running (about 8 minutes, fullscreen)"
         xk stdbuf -oL glmark2 --fullscreen --annotate 2>&1 | tee "$out/glmark2-$ts.txt" | grep -i 'glmark2 Score\|GL_RENDERER\|error'
         score="$(grep -o 'glmark2 Score: [0-9]*' "$out/glmark2-$ts.txt" | awk '{print $3}')"
         logger -t kiosk-bench -- "{\"test\":\"glmark2\",\"score\":${score:-null},\"file\":\"$out/glmark2-$ts.txt\"}"
