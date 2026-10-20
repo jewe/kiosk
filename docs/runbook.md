@@ -2,8 +2,8 @@
 
 ## First device, step by step
 
-1. **Stick 1**: Ubuntu Server LTS ISO (26.04 tested). **Stick 2**: `autoinstall/make-cidata.sh --hostname kiosk-01 --disk /dev/diskN`.
-2. Boot the PC from stick 1, confirm autoinstall, wait for the reboot, remove the sticks.
+1. One stick: `autoinstall/make-iso.sh --iso <ubuntu-server.iso> --hostname kiosk-01`, write the ISO to a stick. (Alternative: stock ISO on stick 1 plus `make-cidata.sh --disk /dev/diskN` on stick 2, then one keypress to confirm.)
+2. Boot the PC from the stick, wait for the reboot, remove the stick.
 3. `ssh kioskadmin@kiosk-01` (SSH key only). `sudo /opt/kiosksystem/setup.sh` (5 to 10 minutes, installs the display stack and drivers).
 4. `sudo /opt/kiosksystem/apps/web/install.sh`.
 5. `sudo nano /opt/kiosk/config/kiosk.yaml`: set the URL, screens, touch output. `sudo kioskctl apply`.

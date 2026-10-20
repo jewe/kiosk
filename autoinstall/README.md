@@ -1,4 +1,10 @@
-# autoinstall — unattended Ubuntu Server 24.04 install
+# autoinstall — unattended Ubuntu Server install
+
+## One stick, no keypress (recommended)
+
+`./make-iso.sh --iso ~/Downloads/ubuntu-26.04.1-live-server-amd64.iso --hostname kiosk-02 --disk /dev/diskN` repacks the stock ISO with `autoinstall` on the kernel command line and the rendered config as `/autoinstall.yaml` (needs `brew install xorriso`). Write the ISO to one stick, boot, wait. Without `--disk` the ISO lands in `out/<hostname>/`.
+
+## Two sticks (stock ISO + CIDATA)
 
 1. Write the stock Ubuntu Server 24.04 ISO to USB stick 1 (balenaEtcher or `dd`).
 2. Build stick 2: `./make-cidata.sh --hostname kiosk-01 --disk /dev/diskN` (or `--img out/cidata.img` for a VM).
