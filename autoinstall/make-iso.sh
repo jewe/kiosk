@@ -28,7 +28,7 @@ work="$(mktemp -d)"; trap 'rm -rf "$work"' EXIT
 # grub.cfg from the ISO: add `autoinstall` to every linux line, short timeout
 xorriso -osirrox on -indev "$iso" -extract /boot/grub/grub.cfg "$work/grub.cfg" >/dev/null 2>&1
 chmod u+w "$work/grub.cfg"
-sed -i.bak -E 's/^(\s*linux\s+\S+)(.*)$/\1 autoinstall\2/; s/^set timeout=.*/set timeout=1/' "$work/grub.cfg"
+sed -i.bak -E 's/^([[:space:]]*linux[[:space:]]+[^[:space:]]+)(.*)$/\1 autoinstall\2/; s/^set timeout=.*/set timeout=1/' "$work/grub.cfg"
 grep -q 'autoinstall' "$work/grub.cfg" || { echo "could not patch grub.cfg" >&2; exit 1; }
 
 xorriso -indev "$iso" -outdev "$out/$hostname.iso" \

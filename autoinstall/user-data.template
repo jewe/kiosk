@@ -1,6 +1,6 @@
 #cloud-config
-# Ubuntu Server 24.04 autoinstall for the kiosk. Rendered by make-cidata.sh.
-# Placeholders: __HOSTNAME__ __USERNAME__ __PASSWORD_HASH__ __SSH_KEY__ __REPO_URL__ __LOCALE__ __KEYBOARD__ __TIMEZONE__ __ROOT_SIZE__ __DATA_SIZE__
+# Ubuntu Server autoinstall for the kiosk (24.04 and 26.04). Rendered by make-cidata.sh.
+# Placeholders in this file are replaced by make-cidata.sh (hostname, user, password hash, ssh key, repo, locale, keyboard, timezone, sizes).
 autoinstall:
   version: 1
   locale: __LOCALE__
