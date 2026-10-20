@@ -94,8 +94,9 @@ cmd_status() {
         apps+=("$n:$(systemctl is-active "$(app_unit "$n")" 2>/dev/null || echo unknown)")
     done
     if [ "$json" -eq 1 ]; then
-        printf '{"device":"%s","version":"%s","uptime":"%s","persistence":"%s","overlay_active":"%s","ip":"%s","cpu_temp":"%s","session":"%s","services":{"tunnel":%s,"usb_action":%s,"monitoring":%s,"telegram":%s,"scheduler":%s},"apps":[' \
-            "$host" "$ver" "$up" "$mode" "$ov" "$ip" "$temp" "$session" \
+        printf '{"device":"%s","version":"%s","uptime":"%s","persistence":"%s","overlay_active":"%s","ip":"%s","cpu_temp":"%s","mem_free_mb":%s,"disk_free_root_mb":%s,"disk_free_data_mb":%s,"session":"%s","services":{"tunnel":%s,"usb_action":%s,"monitoring":%s,"telegram":%s,"scheduler":%s},"apps":[' \
+            "$host" "$ver" "$up" "$mode" "$ov" "$ip" "$temp" \
+            "$(free -m | awk '/^Mem:/ {print $7}')" "$(df -m --output=avail / | tail -1 | tr -d ' ')" "$(df -m --output=avail "$KIOSK_DIR" 2>/dev/null | tail -1 | tr -d ' ' || echo 0)" "$session" \
             "$(cfg '.services.tunnel.enabled' false)" "$(cfg '.services.usb_action.enabled' false)" "$(cfg '.services.monitoring.enabled' false)" "$(cfg '.services.telegram.enabled' false)" "$(cfg '.services.scheduler.enabled' false)"
         local first=1
         for a in "${apps[@]}"; do
@@ -111,6 +112,8 @@ cmd_status() {
     echo "persistence:  $mode (root overlay: $ov, /opt/kiosk: $(findmnt -n -o FSTYPE "$KIOSK_DIR" 2>/dev/null | tail -1 || echo "dir on root"))"
     echo "ip:           ${ip:-none}"
     echo "cpu temp:     ${temp:-n/a}"
+    echo "memory:       $(free -m | awk '/^Mem:/ {printf "%d MB free of %d MB (%d%% used)", $7, $2, ($2-$7)*100/$2}')"
+    echo "disk:         $(df -h --output=target,avail,size,pcent / "$KIOSK_DIR" 2>/dev/null | awk 'NR>1 {printf "%s %s free of %s (%s used)  ", $1, $2, $3, $4}' | sed 's/  $//')"
     echo "session:      $session"
     echo "services:"
     svc_line() {  # svc_line <label> <unit> <config-flag>: shows config state and unit state
