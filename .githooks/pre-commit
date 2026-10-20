@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Bumps the patch number in VERSION on every commit (minor/major: tools/release.sh).
+# Activated once per clone with: git config core.hooksPath .githooks
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+[ -f VERSION ] || exit 0
+# skip when VERSION is already staged (release.sh) or the commit is a merge
+git diff --cached --quiet -- VERSION || exit 0
+[ -f .git/MERGE_HEAD ] && exit 0
+IFS=. read -r a b c < VERSION
+echo "$a.$b.$((c+1))" > VERSION
+git add VERSION

@@ -43,7 +43,7 @@ sudo kioskctl storage init      # creates the kiosk-data LV from free VG space
 | update system scripts | `sudo kioskctl update` (needs rw) |
 | screenshot | `sudo kioskctl screenshot` (file) or `sudo kioskctl screenshot --telegram` |
 | copy files from a USB stick | `sudo kioskctl usb mount`, copy from `/media/usb`, `sudo kioskctl usb umount`; or on screen `sudo kioskctl files` (caja, after `tools/install.sh mate`) |
-| release a version | `tools/release.sh patch` on the Mac, then `sudo kioskctl update` on the devices |
+| release a version | patch bumps with every commit (hook); `tools/release.sh minor` on the Mac for a minor release, then `sudo kioskctl update` on the devices |
 
 ## Troubleshooting
 
