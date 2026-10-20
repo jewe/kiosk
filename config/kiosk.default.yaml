@@ -6,6 +6,7 @@ device:
   id: ""                     # empty = hostname
 
 display:
+  tearfree: true             # Xorg TearFree (modesetting/amdgpu); false = a little more throughput, possible tearing
   background: /opt/kiosksystem/branding/backgrounds/black.jpg
   outputs: []                # empty = xrandr --auto. Example:
   # - name: HDMI-1
@@ -49,6 +50,14 @@ apps:
   #   on_data_change: reload
   #   port: 8080
   #   screen: primary
+
+chrome:
+  gpu: auto                  # auto | software (--disable-gpu, only for broken drivers)
+  flags: []                  # extra Chrome flags for every web/static app, e.g. ["--enable-features=Vulkan"]
+
+performance:
+  gpu_min_freq: auto         # auto | max | <MHz>: Intel GPU clock floor (max = no ramp-up jitter, more heat)
+  low_latency: false         # true = shallow CPU C-states (kernel option, reboot); try if frame times are jittery
 
 network:
   wifi: []                   # up to 3 names; credentials in /opt/kiosk/secrets/wifi.env

@@ -5,6 +5,7 @@ Apply with `sudo kioskctl apply`. Unknown keys are ignored. Everything has a def
 | Key | Meaning |
 |---|---|
 | `device.id` | device name in status and heartbeat; empty = hostname |
+| `display.tearfree` | Xorg TearFree for modesetting/amdgpu (true). See `docs/performance.md` |
 | `display.background` | image for the root window and the boot splash |
 | `display.outputs[]` | xrandr settings per output: `name`, `primary`, `mode`, `pos` (`XxY`), `rotate`, `rate`, `enabled`, `transform` (9 comma-separated matrix values). Empty list = `xrandr --auto` |
 | `touch.output` | output name the touchscreen is mapped to |
@@ -15,6 +16,8 @@ Apply with `sudo kioskctl apply`. Unknown keys are ignored. Everything has a def
 | type `slideshow` | `path` (directory), `interval` (seconds per image, 10) |
 | type `launcher` | `command` (run with bash -c), `wm_class` (optional, to find the window), `workdir` |
 | type `static` | `path` (directory to serve) or `repo` + `branch` + `subdir` (app build, cloned to `/opt/kiosk/apps/<name>/repo`); optional `data_repo` + `data_branch` + `data_subdir` served under `data_url` (`/data`) with `Cache-Control: no-cache`; `update_on_boot`, `update_interval` (0 = off), `on_app_change` (restart), `on_data_change` (reload); `port` (127.0.0.1 only, 8080), `extra_flags`. SPA fallback to index.html is on. Private repos use per-repo deploy keys from `kioskctl secrets git-key <name>-app` / `<name>-data` (fallback: the unlabelled key). See `docs/nuxt-app.md` |
+| `chrome.gpu`, `chrome.flags[]` | `auto` or `software` (`--disable-gpu`); extra Chrome flags for every web/static app. `--enable-features=` / `--disable-features=` are merged with the defaults |
+| `performance.gpu_min_freq`, `performance.low_latency` | Intel GPU clock floor (`auto`, `max`, MHz); shallow C-states via kernel option (reboot). See `docs/performance.md` |
 | `network.wifi[]` | up to three service WLAN names in priority order; `WIFI_<NAME>_SSID` / `WIFI_<NAME>_PSK` in `secrets/wifi.env`. For a one-off on-site network use `kioskctl wifi connect <ssid>` instead (profile `onsite`, lower priority) |
 | `services.tunnel` | `enabled`, `host`, `port` (22), `user` (tunnel), `remote_port` (20022). Key in `secrets/tunnel/`, public key printed by apply |
 | `services.usb_action` | `enabled`; action script `/opt/kiosk/usb-action.sh` |

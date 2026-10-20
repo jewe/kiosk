@@ -110,7 +110,7 @@ Rules that hold in every mode:
 ### D11. Tests and benchmarks
 
 - `tests/stress.sh`: dotool clicks, touches and scrolls for N hours while sampling memory. Pass means no restarts and flat memory.
-- `tests/bench.sh`: MotionMark in Chrome plus glmark2. Results go to the journal and `/opt/kiosk/data/bench/`.
+- `tests/bench.sh`: MotionMark in Chrome (production flags, score via DevTools, offline copy of MotionMark) plus glmark2, and an A/B mode for Chrome flags. Results go to the journal and `/opt/kiosk/data/bench/`. Tuning levers and reference scores: `docs/performance.md`.
 - `kioskctl doctor`: self-test of every component after install.
 
 ### D12. Optional features

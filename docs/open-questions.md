@@ -7,7 +7,7 @@ Small items. Mark a row `ok` to accept the proposed default; it is then implemen
 | 1 | App rollback: keep a "last known good" copy of the app repo and switch with a symlink? | accepted: not in the first version, add when a bad update has actually happened once | done |
 | 2 | journald retention in `data+journal` mode | accepted and implemented in core/06_persistence.sh: 90 days, 500 MB cap, `SyncIntervalSec=5min` | done |
 | 3 | Stress-test pass criteria | implemented in tests/stress.sh: no app restarts, memory growth under 10 % first vs last quarter | done |
-| 4 | Benchmark numbers that matter | glmark2 automated (`kioskctl bench gpu`); MotionMark only opened in Chrome, score read on screen. Automating it needs the DevTools protocol | partly |
+| 4 | Benchmark numbers that matter | glmark2 and MotionMark automated (`kioskctl bench gpu|motionmark|ab`), MotionMark score via DevTools (`tests/cdp.py`), see `docs/performance.md`. MotionMark run on kiosk-01 still pending (device was offline) | done |
 | 5 | Heartbeat interval to the external receiver | 5 minutes, `services.monitoring.interval` | done |
 | 6 | Device identity | hostname set during autoinstall; `device.id` empty = hostname (implemented) | done |
 | 7 | Which Chrome policies beyond extensions (no updates, no password manager, no first-run, no translate) | all of those on, in apps/web/policies.json | done |

@@ -13,6 +13,7 @@ gpu_temp=""; gpu_util=""
 if command -v nvidia-smi >/dev/null; then
     read -r gpu_temp gpu_util < <(nvidia-smi --query-gpu=temperature.gpu,utilization.gpu --format=csv,noheader,nounits 2>/dev/null | tr -d ',' | head -1) || true
 fi
+gpu_mhz="$(cat /sys/class/drm/card*/gt_cur_freq_mhz 2>/dev/null | head -1)"
 throttle="$(cat /sys/devices/system/cpu/cpu0/thermal_throttle/core_throttle_count 2>/dev/null)"
 load="$(cut -d' ' -f1 /proc/loadavg)"
 mem_pct="$(awk '/MemTotal/ {t=$2} /MemAvailable/ {a=$2} END {if (t) printf "%.0f", (t-a)*100/t}' /proc/meminfo)"
@@ -27,11 +28,11 @@ session="$(systemctl is-active kiosk-session.service 2>/dev/null)"
 line="$(jq -c -n \
     --arg ts "$(date -Is)" --arg host "$(hostname)" --arg session "$session" \
     --argjson cpu_temp "$(num "$cpu_temp")" --argjson gpu_temp "$(num "$gpu_temp")" --argjson gpu_util "$(num "$gpu_util")" \
-    --argjson fan "$(num "$fan")" --argjson throttle "$(num "$throttle")" --argjson load "$(num "$load")" \
+     --argjson gpu_mhz "$(num "$gpu_mhz")" --argjson fan "$(num "$fan")" --argjson throttle "$(num "$throttle")" --argjson load "$(num "$load")" \
     --argjson mem_pct "$(num "$mem_pct")" --argjson disk_root "$(num "$disk_root")" --argjson disk_data "$(num "$disk_data")" \
     --argjson uptime "$(num "$uptime_s")" --argjson restarts "$restarts" \
     'def r1: if . == null then null else (. * 10 | round / 10) end;
-     {ts:$ts,host:$host,cpu_temp:($cpu_temp|r1),gpu_temp:($gpu_temp|r1),gpu_util:$gpu_util,fan:$fan,throttle:$throttle,load:$load,mem_pct:$mem_pct,disk_root:$disk_root,disk_data:$disk_data,uptime:$uptime,session:$session,restarts:$restarts}')"
+     {ts:$ts,host:$host,cpu_temp:($cpu_temp|r1),gpu_temp:($gpu_temp|r1),gpu_util:$gpu_util,gpu_mhz:$gpu_mhz,fan:$fan,throttle:$throttle,load:$load,mem_pct:$mem_pct,disk_root:$disk_root,disk_data:$disk_data,uptime:$uptime,session:$session,restarts:$restarts}')"
 
 if [ "${1:-}" = "--log" ]; then
     logger -t kiosk-monitor -- "$line"

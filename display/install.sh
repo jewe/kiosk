@@ -35,6 +35,7 @@ elif has_gpu amd; then
 elif has_gpu intel; then
     log "Intel GPU detected"
     apt_install intel-media-va-driver-non-free 2>/dev/null || apt_install intel-media-va-driver
+    apt_install intel-gpu-tools mesa-vulkan-drivers 2>/dev/null || true
     install -m 0644 "${KIOSK_SYS}/display/xorg.conf.d/20-kiosk-modesetting.conf" /etc/X11/xorg.conf.d/
 else
     log "no known GPU detected (VM?), using modesetting"

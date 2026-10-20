@@ -17,6 +17,7 @@ RuntimeDirectory=kiosk/%i
 RuntimeDirectoryMode=0700
 ExecStartPre=/opt/kiosksystem/display/wait-for-x.sh
 ExecStart=/opt/kiosksystem/apps/static/launch.sh %i
+ExecStopPost=/opt/kiosksystem/apps/web/shader-cache.sh save %i /run/kiosk/%i
 Restart=always
 RestartSec=2
 KillMode=mixed
