@@ -368,7 +368,7 @@ cmd_wifi() {
     local sub="${1:-status}"; shift || true
     case "$sub" in
         status)
-            nmcli -t -f WIFI g radio | grep -q enabled || warn "radio is off (kioskctl wifi on)"
+            [ "$(nmcli radio wifi)" = enabled ] || warn "radio is off (kioskctl wifi on)"
             nmcli -f DEVICE,TYPE,STATE,CONNECTION dev status | awk 'NR==1 || $2=="wifi"'
             local dev; dev="$(nmcli -t -f DEVICE,TYPE dev status | awk -F: '$2=="wifi" {print $1; exit}')"
             [ -n "$dev" ] || { warn "no wifi device"; return 0; }
@@ -394,7 +394,7 @@ cmd_wifi() {
             if [ -n "$psk" ]; then
                 nmcli con modify onsite wifi-sec.key-mgmt wpa-psk wifi-sec.psk "$psk" >/dev/null
             fi
-            if nmcli -w 30 con up onsite >/dev/null; then
+            if nmcli -w 30 con up onsite >/dev/null 2>&1; then
                 log "connected to '$ssid'"; cmd_wifi status
                 [ "$(persistence_mode)" = rw ] || [ "$(persistence_mode)" = data ] || warn "persistence $(persistence_mode): the profile is gone after a reboot"
             else
