@@ -40,14 +40,21 @@ apps:
   #   repo: git@github.com:you/menu-app.git   # app build; private repos: kioskctl secrets git-key
   #   branch: build
   #   subdir: ""                         # directory inside the repo to serve
-  #   data_repo: git@github.com:you/menu-data.git   # optional data repo served under data_url
-  #   data_branch: main
-  #   data_subdir: ""
-  #   data_url: /data
+  #   data:                              # up to 5 data repos, each served under its own URL
+  #     - name: data                     # URL /data, checkout /opt/kiosk/apps/menu/repos/data, key secrets/git/menu-data
+  #       repo: git@github.com:you/menu-data.git
+  #       branch: main
+  #       subdir: ""                     # optional folder inside the repo
+  #       url: /data                     # default /<name>
+  #       lfs: false                     # true = pull the Git LFS objects of the current commit (large files)
+  #       on_change: reload              # reload | restart | none
+  #     - name: videos
+  #       repo: git@github.com:you/menu-videos.git
+  #       lfs: true
+  #       on_change: none
   #   update_on_boot: true               # pull both repos at boot
   #   update_interval: 15m               # and periodically (0 = off)
   #   on_app_change: restart             # restart | reload | none
-  #   on_data_change: reload
   #   port: 8080
   #   screen: primary
 

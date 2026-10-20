@@ -18,7 +18,7 @@ Status and health
 
 Configuration
   apply                      validate kiosk.yaml and apply apps, display, services, extensions
-  app list|start|stop|restart|logs|update [name]
+  app list|start|stop|restart|logs|update [name] [repo]
   display                    re-apply screen layout and touch mapping now
   extension list|update [id]|id <name>   Chrome extensions (config chrome.extensions)
   secrets git-key [label]|tunnel-key|list   deploy keys and the tunnel key
@@ -49,8 +49,9 @@ cmd_help() {
         "") usage ;;
         status) cat <<'H'
 kioskctl status [--json]
-  One screen with everything about this kiosk: version, persistence mode, session state, apps and
-  their units, outputs, enabled services, WLAN, memory and disk space. --json prints the same as one
+  One screen with everything about this kiosk: version (and commits behind origin), OS and kernel,
+  upgradable packages and reboot-required flag, persistence mode, session state, apps with their repos
+  (commit, age, size, lfs, failed syncs), outputs, enabled services, WLAN, memory and disk space. --json prints the same as one
   JSON object (the heartbeat sends this).
 H
 ;;      doctor) cat <<'H'
@@ -76,7 +77,7 @@ H
 kioskctl app list                      apps from the config with unit name and state
 kioskctl app start|stop|restart <name>
 kioskctl app logs <name>               last 100 journal lines of the unit
-sudo kioskctl app update <name>        pull the app and data repos of a static app now
+sudo kioskctl app update <name> [repo] pull the repos of a static app now (repo = app or a data name, default all)
   Units are kiosk-<type>@<name>.service under kiosk.target. Example: sudo kioskctl app restart menu
 H
 ;;      display) cat <<'H'
@@ -196,6 +197,43 @@ render_app_env() {
         val="${val//\\/\\\\}"; val="${val//\"/\\\"}"
         echo "APP_${key^^}=\"${val}\""
     done < <(yq -r ".apps[$i] | keys | .[]" "$KIOSK_CONFIG")
+    render_app_data "$i"
+}
+
+# render_app_data <index>   Data repos of a static app: APP_DATA_COUNT and APP_DATA_<n>_NAME|REPO|BRANCH|SUBDIR|URL|LFS|ON_CHANGE.
+# Source: apps[i].data[] (up to 5), or the legacy keys data_repo/data_branch/data_subdir/data_url/on_data_change as entry "data".
+render_app_data() {
+    local i="$1" n j k v name names=() out=0 q
+    q() { v="${1//\\/\\\\}"; v="${v//\"/\\\"}"; printf '"%s"' "$v"; }
+    n="$(cfg ".apps[$i].data | length" 0)"
+    if [ "$n" = 0 ] && [ -n "$(cfg ".apps[$i].data_repo")" ]; then
+        echo "APP_DATA_COUNT=1"
+        echo "APP_DATA_0_NAME=\"data\""
+        echo "APP_DATA_0_REPO=$(q "$(cfg ".apps[$i].data_repo")")"
+        echo "APP_DATA_0_BRANCH=$(q "$(cfg ".apps[$i].data_branch" main)")"
+        echo "APP_DATA_0_SUBDIR=$(q "$(cfg ".apps[$i].data_subdir")")"
+        echo "APP_DATA_0_URL=$(q "$(cfg ".apps[$i].data_url" /data)")"
+        echo "APP_DATA_0_LFS=\"false\""
+        echo "APP_DATA_0_ON_CHANGE=$(q "$(cfg ".apps[$i].on_data_change" reload)")"
+        return
+    fi
+    [ "$n" -le 5 ] || { warn "apps[$i]: only the first 5 data repos are used"; n=5; }
+    for ((j=0; j<n; j++)); do
+        name="$(cfg ".apps[$i].data[$j].name")"
+        [[ "$name" =~ ^[a-z0-9_-]+$ ]] || { warn "apps[$i].data[$j]: name '$name' must be [a-z0-9_-]"; continue; }
+        [[ " ${names[*]:-} " == *" $name "* ]] && { warn "apps[$i].data: duplicate name '$name'"; continue; }
+        [ -n "$(cfg ".apps[$i].data[$j].repo")" ] || { warn "apps[$i].data[$j] '$name': repo missing"; continue; }
+        names+=("$name")
+        echo "APP_DATA_${out}_NAME=$(q "$name")"
+        echo "APP_DATA_${out}_REPO=$(q "$(cfg ".apps[$i].data[$j].repo")")"
+        echo "APP_DATA_${out}_BRANCH=$(q "$(cfg ".apps[$i].data[$j].branch" main)")"
+        echo "APP_DATA_${out}_SUBDIR=$(q "$(cfg ".apps[$i].data[$j].subdir")")"
+        echo "APP_DATA_${out}_URL=$(q "$(cfg ".apps[$i].data[$j].url" "/$name")")"
+        echo "APP_DATA_${out}_LFS=$(q "$(cfg ".apps[$i].data[$j].lfs" false)")"
+        echo "APP_DATA_${out}_ON_CHANGE=$(q "$(cfg ".apps[$i].data[$j].on_change" reload)")"
+        out=$((out+1))
+    done
+    echo "APP_DATA_COUNT=$out"
 }
 
 # cursor_show / cursor_hide: the kiosk session hides the pointer (unclutter-xfixes); dev tools need it
@@ -218,8 +256,21 @@ cmd_version() {
     echo "${v}${g:+ (${g})}"
 }
 
+# OS and update state for status: os_name, kernel, apt_upgradable (from update-notifier, else apt simulation), reboot_required, system_behind
+os_state() {
+    os_name="$(. /etc/os-release 2>/dev/null; echo "${PRETTY_NAME:-unknown}")"; kernel="$(uname -r)"
+    if [ -f /var/lib/update-notifier/updates-available ]; then
+        apt_upgradable="$(grep -o '^[0-9]\+ update' /var/lib/update-notifier/updates-available | head -1 | cut -d' ' -f1)"
+    fi
+    [ -n "${apt_upgradable:-}" ] || apt_upgradable="$(timeout 8 apt-get -s -o Debug::NoLocking=true upgrade 2>/dev/null | grep -c '^Inst ' || echo '?')"
+    reboot_required=no; [ -f /run/reboot-required ] && reboot_required=yes
+    system_behind="$(git -C "$KIOSK_SYS" rev-list --count HEAD..@{u} 2>/dev/null || echo '?')"
+    system_fetched="$(stat -c %y "$KIOSK_SYS/.git/FETCH_HEAD" 2>/dev/null | cut -d. -f1 || true)"
+}
+
 cmd_status() {
     local json=0; [ "${1:-}" = "--json" ] && json=1
+    local os_name kernel apt_upgradable reboot_required system_behind system_fetched; os_state
     local host mode ver up ov ip temp session apps=()
     host="$(hostname)"; mode="$(persistence_mode)"; ver="$(cmd_version)"
     up="$(uptime -p | sed 's/^up //')"
@@ -231,20 +282,22 @@ cmd_status() {
         apps+=("$n:$(systemctl is-active "$(app_unit "$n")" 2>/dev/null || echo unknown)")
     done
     if [ "$json" -eq 1 ]; then
-        printf '{"device":"%s","version":"%s","uptime":"%s","persistence":"%s","overlay_active":"%s","ip":"%s","cpu_temp":"%s","mem_free_mb":%s,"disk_free_root_mb":%s,"disk_free_data_mb":%s,"session":"%s","services":{"tunnel":%s,"usb_action":%s,"monitoring":%s,"telegram":%s,"scheduler":%s},"apps":[' \
-            "$host" "$ver" "$up" "$mode" "$ov" "$ip" "$temp" \
+        printf '{"device":"%s","version":"%s","os":"%s","kernel":"%s","apt_upgradable":"%s","reboot_required":"%s","system_behind":"%s","uptime":"%s","persistence":"%s","overlay_active":"%s","ip":"%s","cpu_temp":"%s","mem_free_mb":%s,"disk_free_root_mb":%s,"disk_free_data_mb":%s,"session":"%s","services":{"tunnel":%s,"usb_action":%s,"monitoring":%s,"telegram":%s,"scheduler":%s},"apps":[' \
+            "$host" "$ver" "$os_name" "$kernel" "$apt_upgradable" "$reboot_required" "$system_behind" "$up" "$mode" "$ov" "$ip" "$temp" \
             "$(free -m | awk '/^Mem:/ {print $7}')" "$(df -m --output=avail / | tail -1 | tr -d ' ')" "$(df -m --output=avail "$KIOSK_DIR" 2>/dev/null | tail -1 | tr -d ' ' || echo 0)" "$session" \
             "$(cfg '.services.tunnel.enabled' false)" "$(cfg '.services.usb_action.enabled' false)" "$(cfg '.services.monitoring.enabled' false)" "$(cfg '.services.telegram.enabled' false)" "$(cfg '.services.scheduler.enabled' false)"
         local first=1
         for a in "${apps[@]}"; do
             [ $first -eq 1 ] || printf ','
-            printf '{"name":"%s","state":"%s"}' "${a%%:*}" "${a#*:}"; first=0
+            printf '{"name":"%s","state":"%s","repos":%s}' "${a%%:*}" "${a#*:}" "$(cat "${KIOSK_DIR}/apps/${a%%:*}/state"/*.json 2>/dev/null | jq -sc 'map({name,commit,updated:.ts,size_mb,lfs,result})' 2>/dev/null || echo '[]')"; first=0
         done
         printf '],"ts":"%s"}\n' "$(date -Is)"
         return
     fi
     echo "=== Kiosk $host ==="
-    echo "version:      $ver"
+    echo "version:      $ver$([[ "$system_behind" =~ ^[0-9]+$ ]] && [ "$system_behind" -gt 0 ] && echo " ($system_behind commits behind origin${system_fetched:+, last fetch $system_fetched})")"
+    echo "os:           $os_name, kernel $kernel"
+    echo "updates:      $apt_upgradable packages upgradable$([ "$reboot_required" = yes ] && echo ", REBOOT REQUIRED")"
     echo "uptime:       $up"
     echo "persistence:  $mode (root overlay: $ov, /opt/kiosk: $(findmnt -n -o FSTYPE "$KIOSK_DIR" 2>/dev/null | tail -1 || echo "dir on root"))"
     echo "ip:           ${ip:-none}"
@@ -268,7 +321,16 @@ cmd_status() {
     echo "usb storage:  $([ "$(cfg '.security.disable_usb_storage' false)" = true ] && echo disabled || echo enabled)"
     echo "devmode:      $([ -f "${KIOSK_STATE}/devmode" ] && echo on || echo off)"
     echo "apps:"
-    for a in "${apps[@]}"; do printf '  %-16s %s\n' "${a%%:*}" "${a#*:}"; done
+    for a in "${apps[@]}"; do
+        printf '  %-16s %s\n' "${a%%:*}" "${a#*:}"
+        for f in "${KIOSK_DIR}/apps/${a%%:*}/state"/*.json; do
+            [ -f "$f" ] || continue
+            jq -r --argjson now "$(date +%s)" '
+                def ago: (($now - (.ts | sub("[+-][0-9]{2}:[0-9]{2}$"; "Z") | sub("\\.[0-9]+"; "") | fromdateiso8601)) as $s
+                          | if $s < 90 then "\($s) s ago" elif $s < 5400 then "\($s/60|floor) min ago" elif $s < 172800 then "\($s/3600|floor) h ago" else "\($s/86400|floor) d ago" end);
+                "    \(.name|.+"        "|.[0:8]) \(.commit // "-"|.+"       "|.[0:7]) \(try ago catch "?"|.+"          "|.[0:10]) \(.size_mb|tostring|.+" MB") \(if .lfs then "lfs" else "" end) \(if .result == "failed" then "FAILED" else "" end)"' "$f" 2>/dev/null
+        done
+    done
     if x_running; then
         echo "screens:"
         env "${XENV[@]}" xrandr --query | awk '/ connected/ {geo=($3=="primary")?$4:$3; printf "  %-10s %s %s\n", $1, geo, ($3=="primary")?"(primary)":""}'
@@ -309,6 +371,7 @@ cmd_doctor() {
     check "ufw active"                      "ufw status | grep -q 'Status: active'"
     check "sensors available"               "sensors"
     check "monitor timer enabled"           "systemctl is-enabled kiosk-monitor.timer"
+    check "no failed repo sync"             "! cat ${KIOSK_DIR}/apps/*/state/*.json 2>/dev/null | jq -e 'select(.result==\"failed\")' >/dev/null"
     if [ -f /etc/opt/chrome/policies/managed/kiosk-extensions.json ]; then
         check "all forced extensions are served" "(for u in \$(jq -r '.ExtensionInstallForcelist[]' /etc/opt/chrome/policies/managed/kiosk-extensions.json | cut -d';' -f2); do curl -fsI --max-time 2 \"\$u\" >/dev/null || exit 1; done)"
     fi
@@ -395,7 +458,7 @@ cmd_app() {
         update) require_root; [ -n "$n" ] || die "app name required"
                 t="$(yq -r ".apps[] | select(.name==\"$n\") | .type" "$KIOSK_CONFIG")"
                 [ -x "${KIOSK_SYS}/apps/${t}/update.sh" ] || die "app type '$t' has no update"
-                "${KIOSK_SYS}/apps/${t}/update.sh" "$n" ;;
+                "${KIOSK_SYS}/apps/${t}/update.sh" "$n" "${3:-}" ;;
         *) usage; exit 1 ;;
     esac
 }

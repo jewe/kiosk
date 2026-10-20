@@ -8,7 +8,7 @@ require_root
 
 [ -f /etc/systemd/system/kiosk-web@.service ] || bash "${KIOSK_SYS}/apps/web/install.sh"
 apt_update_once
-apt_install nginx git
+apt_install nginx git git-lfs
 rm -f /etc/nginx/sites-enabled/default
 systemctl enable nginx >/dev/null
 

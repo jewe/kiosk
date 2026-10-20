@@ -26,9 +26,19 @@ Build locally and commit the output. Two layouts, both work with the same kiosk 
 1. **`build` branch** (recommended): `docs/examples/deploy.sh` from this repo, copied into the app repo, runs `npm run generate` and pushes `.output/public` to the `build` branch. Kiosk config: `branch: build`, `subdir: ""`.
 2. **Folder in `main`**: copy `.output/public` to `dist/` and commit it. Kiosk config: `branch: main`, `subdir: dist`.
 
-## Data repo
+## Data repos
 
-Plain files: `menu.json`, `images/…`. Edited by anyone with access to the repo, on GitHub directly or with a desktop client. Keep images at display size (a 4K image for a 300 px tile costs decode time on every reload). Optional `data_subdir` serves only one folder of the repo.
+Plain files: `menu.json`, `images/…`. Edited by anyone with access to the repo, on GitHub directly or with a desktop client. Keep images at display size (a 4K image for a 300 px tile costs decode time on every reload). Optional `subdir` serves only one folder of the repo.
+
+An app can have **up to five data repos**, each with its own URL prefix, deploy key, branch and change action. Split by who edits and how often: texts and menu in `data`, map tiles in `geodata`, videos in `videos`. The app fetches them under their URLs (`/data/menu.json`, `/geodata/tiles/…`, `/videos/clip.mp4`); nginx serves every data URL with `Cache-Control: no-cache`, so a reload shows the pulled state.
+
+## Large files
+
+- Plain git with the kiosk's shallow clone is fine up to a few hundred MB per repo. The kiosk keeps only the latest commit on disk (shallow fetch, then `git gc` once the object store exceeds 50 MB). The *server side* keeps the whole history, so a repo with replaced videos grows without bound on GitHub; keep videos in their own repo so the app and data repos stay small.
+- **Git LFS** (`lfs: true`) keeps the git history small and the kiosk pulls only the LFS objects of the current commit, then prunes the local LFS cache. Needs `git lfs track "*.mp4"` in the repo (and `git-lfs` on the editing machines). GitHub's free LFS quota is 1 GB storage and 1 GB bandwidth per month per account, and every kiosk pull counts: ten kiosks pulling a 500 MB repo exceed it at the first update. LFS on a self-hosted Gitea or GitLab has no such quota. Rule of thumb: LFS above about 200 MB per repo, self-hosted when there are several kiosks. A repo that uses LFS without `lfs: true` on the kiosk gets pointer stubs instead of files; the update log warns about it.
+- `on_change: none` for media repos: `<video>` and `<img>` sources are fetched again when they are shown next, no page reload needed.
+
+`kioskctl status` lists every repo of an app with commit, age, size and whether the last sync failed; `kioskctl app update menu videos` pulls one repo now.
 
 ## Kiosk configuration
 
@@ -38,20 +48,30 @@ apps:
     type: static
     repo: git@github.com:you/menu-app.git
     branch: build
-    data_repo: git@github.com:you/menu-data.git
-    data_branch: main
+    data:
+      - name: data                     # served under /data, key secrets/git/menu-data
+        repo: git@github.com:you/menu-data.git
+        branch: main
+        on_change: reload
+      - name: geodata                  # served under /geodata, key secrets/git/menu-geodata
+        repo: git@github.com:you/menu-geodata.git
+      - name: videos
+        repo: git@github.com:you/menu-videos.git
+        lfs: true
+        on_change: none
     update_on_boot: true
     update_interval: 15m
     on_app_change: restart
-    on_data_change: reload
     port: 8080
 ```
+
+The older single-repo keys `data_repo`, `data_branch`, `data_subdir`, `data_url`, `on_data_change` still work and mean one entry named `data`.
 
 Private repos: GitHub accepts a deploy key on **one** repository only, so the kiosk uses one key per repo, named after the app and its role:
 
 ```sh
 sudo kioskctl secrets git-key menu-app     # add to the app repo:  Settings → Deploy keys (read-only)
-sudo kioskctl secrets git-key menu-data    # add to the data repo
+sudo kioskctl secrets git-key menu-data    # add to the data repo; one key per data repo: menu-geodata, menu-videos
 sudo kioskctl apply
 ```
 

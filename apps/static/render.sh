@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Called by `kioskctl apply` for every app of type static: nginx site, content dir, update unit.
+# Called by `kioskctl apply` for every app of type static: nginx site, content dirs, update unit.
 #   render.sh <name>     (env from /opt/kiosk/state/apps/<name>.env)
+# Data repos: APP_DATA_COUNT and APP_DATA_<n>_NAME|REPO|SUBDIR|URL, checked out to /opt/kiosk/apps/<name>/repos/<data>.
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/common.sh"
 LOG_TAG="app:static"
@@ -10,6 +11,7 @@ set -a; source "${KIOSK_STATE}/apps/${name}.env"; set +a
 port="${APP_PORT:-8080}"
 appdir="${KIOSK_DIR}/apps/${name}"
 install -d -o "$KIOSK_USER" -g "$KIOSK_USER" "$appdir"
+mkdir -p "$appdir/repos" "$appdir/state"
 
 need_sync=0
 if [ -n "${APP_REPO:-}" ]; then
@@ -25,18 +27,26 @@ else
     fi
 fi
 
+# one checkout and one nginx location per data repo
 data_block=""
-if [ -n "${APP_DATA_REPO:-}" ]; then
-    [ -d "${appdir}/data/.git" ] || need_sync=1
-    data_root="${appdir}/data${APP_DATA_SUBDIR:+/${APP_DATA_SUBDIR}}"
-    data_url="${APP_DATA_URL:-/data}"; data_url="/${data_url#/}"; data_url="${data_url%/}"
-    data_block="
-    # data repo: always revalidated (ETag), so a pulled change is visible after a reload
-    location ${data_url}/ {
-        alias ${data_root}/;
+count="${APP_DATA_COUNT:-0}"
+for ((j=0; j<count; j++)); do
+    dn="APP_DATA_${j}_NAME"; ds="APP_DATA_${j}_SUBDIR"; du_="APP_DATA_${j}_URL"
+    dname="${!dn}"; dsub="${!ds:-}"; durl="${!du_:-/$dname}"
+    dir="${appdir}/repos/${dname}"
+    # layout before multiple data repos: apps/<name>/data
+    if [ "$dname" = data ] && [ -d "${appdir}/data/.git" ] && [ ! -d "$dir" ]; then
+        mv "${appdir}/data" "$dir" && log "$name: moved data checkout to $dir"
+    fi
+    [ -d "$dir/.git" ] || need_sync=1
+    durl="/${durl#/}"; durl="${durl%/}"
+    data_block="${data_block}
+    # data repo '${dname}': always revalidated (ETag), so a pulled change is visible after a reload
+    location ${durl}/ {
+        alias ${dir}${dsub:+/${dsub}}/;
         add_header Cache-Control \"no-cache\";
     }"
-fi
+done
 if [ "$need_sync" = 1 ]; then
     "${KIOSK_SYS}/apps/static/update.sh" "$name" || warn "clone failed for '${name}'; retried at boot / by the timer or with: kioskctl app update ${name}"
 fi
@@ -55,7 +65,7 @@ NGX
 ln -sfn "/etc/nginx/sites-available/kiosk-${name}.conf" "/etc/nginx/sites-enabled/kiosk-${name}.conf"
 nginx -t >/dev/null 2>&1 && systemctl reload nginx || warn "nginx config test failed for ${name}"
 
-has_repo=0; [ -n "${APP_REPO:-}${APP_DATA_REPO:-}" ] && has_repo=1
+has_repo=0; { [ -n "${APP_REPO:-}" ] || [ "$count" -gt 0 ]; } && has_repo=1
 if [ "${APP_UPDATE_ON_BOOT:-false}" = "true" ] && [ "$has_repo" = 1 ]; then
     systemctl enable "kiosk-content-update@${name}.service" >/dev/null 2>&1
 else
