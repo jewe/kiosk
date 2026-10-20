@@ -24,7 +24,8 @@ Usage: kioskctl <command>
   devmode on|off             escape hotkeys in the session (Ctrl+Alt+T terminal), reconfigures openbox
   screenshot [file]          save a screenshot (default /opt/kiosk/data/screenshots/)
   screenshot --telegram [caption]   send a screenshot to the configured Telegram chat
-  files [dir]                open caja on the kiosk screen (dev tool, needs tools/install.sh mate)
+  files [dir]                open caja on the kiosk screen with a visible cursor (needs tools/install.sh mate)
+  cursor show|hide           show or hide the mouse pointer
   usb list|mount [dev]|umount  USB sticks: list, mount at /media/usb, unmount
   secrets git-key [label]    generate/show a deploy key for a private repo (label e.g. menu-app, menu-data)
   secrets tunnel-key|list    show the tunnel key / list all public keys
@@ -58,6 +59,16 @@ render_app_env() {
         val="${val//\\/\\\\}"; val="${val//\"/\\\"}"
         echo "APP_${key^^}=\"${val}\""
     done < <(yq -r ".apps[$i] | keys | .[]" "$KIOSK_CONFIG")
+}
+
+# cursor_show / cursor_hide: the kiosk session hides the pointer (unclutter-xfixes); dev tools need it
+cursor_show() {
+    pkill -u "$KIOSK_USER" -x unclutter-xfixes 2>/dev/null || true
+    sudo -u "$KIOSK_USER" env "${XENV[@]}" xsetroot -cursor_name left_ptr 2>/dev/null || true
+}
+cursor_hide() {
+    pgrep -u "$KIOSK_USER" -x unclutter-xfixes >/dev/null && return 0
+    sudo -u "$KIOSK_USER" env "${XENV[@]}" sh -c 'unclutter-xfixes --start-hidden --hide-on-touch --timeout 1 --fork >/dev/null 2>&1' || true
 }
 
 # ---------- commands ----------
@@ -353,6 +364,7 @@ case "${1:-}" in
               rc="${KIOSK_SYS}/display/openbox/rc.xml"; [ -f "${KIOSK_STATE}/devmode" ] && rc="${KIOSK_SYS}/display/openbox/rc-dev.xml"
               ln -sfn "$rc" "${KIOSK_STATE}/openbox-rc.xml"; chown -h "$KIOSK_USER:$KIOSK_USER" "${KIOSK_STATE}/openbox-rc.xml"
               x_running && sudo -u "$KIOSK_USER" env "${XENV[@]}" openbox --reconfigure >/dev/null 2>&1 || true
+              if x_running; then [ "${2}" = on ] && cursor_show || cursor_hide; fi
               log "devmode ${2}" ;;
     secrets)  require_root
               case "${2:-}" in
@@ -374,9 +386,12 @@ case "${1:-}" in
               esac ;;
     files)    require_root; x_running || die "X is not running"
               command -v caja >/dev/null || die "caja not installed: sudo ${KIOSK_SYS}/tools/install.sh mate"
+              cursor_show
               sudo -u "$KIOSK_USER" env "${XENV[@]}" XDG_RUNTIME_DIR="/run/user/$(id -u "$KIOSK_USER")" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u "$KIOSK_USER")/bus" \
                   setsid caja --no-desktop "${2:-/opt/kiosk}" >/dev/null 2>&1 < /dev/null &
-              log "caja opened (close it with Ctrl+Alt+Q in dev mode)" ;;
+              log "caja opened, cursor visible (close with Ctrl+Alt+Q in dev mode; hide the cursor again: kioskctl cursor hide)" ;;
+    cursor)   require_root; x_running || die "X is not running"
+              case "${2:-}" in show) cursor_show; log "cursor shown" ;; hide) cursor_hide; log "cursor hidden" ;; *) usage; exit 1 ;; esac ;;
     usb)      require_root
               case "${2:-list}" in
                   list)  lsblk -o NAME,SIZE,FSTYPE,LABEL,MOUNTPOINTS,TRAN -p | awk 'NR==1 || /usb/ || /^[├└│ ]/' ;;

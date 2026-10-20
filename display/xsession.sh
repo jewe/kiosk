@@ -16,7 +16,8 @@ bg="$(cfg '.display.background' '')"
 
 /opt/kiosksystem/services/audio/apply.sh || true
 
-unclutter-xfixes --start-hidden --hide-on-touch --timeout 1 --fork >/dev/null 2>&1 || true
+# pointer hidden in production; visible in dev mode (kioskctl devmode on / kioskctl cursor show)
+[ -f "${KIOSK_STATE}/devmode" ] || unclutter-xfixes --start-hidden --hide-on-touch --timeout 1 --fork >/dev/null 2>&1 || true
 
 # openbox reads its config through a symlink so `kioskctl devmode` can switch it and reconfigure in place
 rc=/opt/kiosksystem/display/openbox/rc.xml
