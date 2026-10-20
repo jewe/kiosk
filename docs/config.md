@@ -21,7 +21,7 @@ Apply with `sudo kioskctl apply`. Unknown keys are ignored. Everything has a def
 | `performance.gpu_min_freq`, `performance.low_latency` | Intel GPU clock floor (`auto`, `max`, MHz); shallow C-states via kernel option (reboot). See `docs/performance.md` |
 | `network.wifi[]` | up to three service WLAN names in priority order; `WIFI_<NAME>_SSID` / `WIFI_<NAME>_PSK` in `secrets/wifi.env`. For a one-off on-site network use `kioskctl wifi connect <ssid>` instead (profile `onsite`, lower priority) |
 | `services.tunnel` | `enabled`, `host`, `port` (22), `user` (tunnel), `remote_port` (20022). Key in `secrets/tunnel/`, public key printed by apply |
-| `services.usb_action` | `enabled`; action script `/opt/kiosk/usb-action.sh` |
+| `services.usb_action` | `enabled`; action script `/opt/kiosk/usb-action.sh`. See `docs/usb.md` |
 | `services.monitoring` | `enabled` (heartbeat), `url`, `interval` (5m, also the local metrics interval). Token in `secrets/monitoring.env` |
 | `services.telegram` | `enabled`, `chat_id`, `interval` (60m), `on_boot` (true): screenshot to a Telegram chat; bot token `TELEGRAM_BOT_TOKEN` in `secrets/telegram.env` |
 | `services.scheduler` | `enabled`, `off_action`: `screen` (DPMS off, default), `apps` (stop all app units), `shutdown` (poweroff, wake via rtcwake at the next on time) |
