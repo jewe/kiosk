@@ -19,6 +19,7 @@ Apply with `sudo kioskctl apply`. Unknown keys are ignored. Everything has a def
 | `services.tunnel` | `enabled`, `host`, `port` (22), `user` (tunnel), `remote_port` (20022). Key in `secrets/tunnel/`, public key printed by apply |
 | `services.usb_action` | `enabled`; action script `/opt/kiosk/usb-action.sh` |
 | `services.monitoring` | `enabled` (heartbeat), `url`, `interval` (5m, also the local metrics interval). Token in `secrets/monitoring.env` |
+| `services.telegram` | `enabled`, `chat_id`, `interval` (60m), `on_boot` (true): screenshot to a Telegram chat; bot token `TELEGRAM_BOT_TOKEN` in `secrets/telegram.env` |
 | `services.scheduler` | `enabled`, `off_action`: `screen` (DPMS off, default), `apps` (stop all app units), `shutdown` (poweroff, wake via rtcwake at the next on time) |
 | `schedule` | map of day → `{on: "HH:MM", off: "HH:MM"}`; days `mon`…`sun`, ranges `mon-fri`, or `daily`. After boot the current state is applied |
 | `security.disable_usb_storage` | blacklist usb-storage; refused while `usb_action` is enabled |

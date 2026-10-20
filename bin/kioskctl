@@ -22,6 +22,10 @@ Usage: kioskctl <command>
   test stress [min] [eps]    simulate usage, sample memory (tests/stress.sh)
   bench info|gpu|motionmark  benchmarks (tests/bench.sh)
   devmode on|off             escape hotkeys in the session (Ctrl+Alt+T terminal), reconfigures openbox
+  screenshot [file]          save a screenshot (default /opt/kiosk/data/screenshots/)
+  screenshot --telegram [caption]   send a screenshot to the configured Telegram chat
+  files [dir]                open caja on the kiosk screen (dev tool, needs tools/install.sh mate)
+  usb list|mount [dev]|umount  USB sticks: list, mount at /media/usb, unmount
   secrets git-key [label]    generate/show a deploy key for a private repo (label e.g. menu-app, menu-data)
   secrets tunnel-key|list    show the tunnel key / list all public keys
   update                     git pull system repo, re-run setup, re-apply
@@ -57,7 +61,13 @@ render_app_env() {
 }
 
 # ---------- commands ----------
-cmd_version() { git -C "$KIOSK_SYS" describe --always --dirty 2>/dev/null || cat "${KIOSK_DIR}/VERSION" 2>/dev/null || echo unknown; }
+# version: major.minor.patch from VERSION in the repo, plus the git commit (and "+N" commits after the tag)
+cmd_version() {
+    local v g
+    v="$(cat "${KIOSK_SYS}/VERSION" 2>/dev/null || echo 0.0.0)"
+    g="$(git -C "$KIOSK_SYS" describe --always --dirty --tags 2>/dev/null || true)"
+    echo "${v}${g:+ (${g})}"
+}
 
 cmd_status() {
     local json=0; [ "${1:-}" = "--json" ] && json=1
@@ -182,7 +192,7 @@ cmd_apply() {
 
     # --- services (each reads its own config section) ---
     local svc
-    for svc in audio wifi tunnel usb security scheduler; do
+    for svc in audio wifi tunnel usb security scheduler telegram; do
         [ -x "${KIOSK_SYS}/services/${svc}/apply.sh" ] || continue
         "${KIOSK_SYS}/services/${svc}/apply.sh" || { warn "service '$svc' apply failed"; problems=1; }
     done
@@ -352,6 +362,26 @@ case "${1:-}" in
                   list) ls -1 "${KIOSK_SECRETS}/git/"*.pub "${KIOSK_SECRETS}/tunnel/"*.pub 2>/dev/null || echo "no keys" ;;
                   tunnel-key) cat "${KIOSK_SECRETS}/tunnel/id_ed25519.pub" 2>/dev/null || die "no tunnel key yet (enable services.tunnel and apply)" ;;
                   *) echo "usage: kioskctl secrets git-key [label]|tunnel-key|list"; exit 1 ;;
+              esac ;;
+    screenshot) shift
+              case "${1:-}" in
+                  --telegram|-t) shift; require_root; "${KIOSK_SYS}/services/telegram/send.sh" "" "${1:-}" ;;
+                  *) "${KIOSK_SYS}/tools/screenshot.sh" "${1:-}" ;;
+              esac ;;
+    files)    require_root; x_running || die "X is not running"
+              command -v caja >/dev/null || die "caja not installed: sudo ${KIOSK_SYS}/tools/install.sh mate"
+              sudo -u "$KIOSK_USER" env "${XENV[@]}" XDG_RUNTIME_DIR="/run/user/$(id -u "$KIOSK_USER")" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u "$KIOSK_USER")/bus" \
+                  setsid caja --no-desktop "${2:-/opt/kiosk}" >/dev/null 2>&1 < /dev/null &
+              log "caja opened (close it with Ctrl+Alt+Q in dev mode)" ;;
+    usb)      require_root
+              case "${2:-list}" in
+                  list)  lsblk -o NAME,SIZE,FSTYPE,LABEL,MOUNTPOINTS,TRAN -p | awk 'NR==1 || /usb/ || /^[├└│ ]/' ;;
+                  mount) dev="${3:-$(lsblk -rno PATH,TYPE,TRAN,FSTYPE | awk '$2=="part" && $3=="usb" && $4!="" {print $1; exit}')}"
+                         [ -n "$dev" ] || { lsblk -rno PATH,TYPE,TRAN,FSTYPE | awk '$2=="part" {print}'; die "no USB partition found"; }
+                         mkdir -p /media/usb; mount -o uid="$(id -u "$KIOSK_USER")",gid="$(id -g "$KIOSK_USER")" "$dev" /media/usb 2>/dev/null || mount "$dev" /media/usb
+                         log "$dev mounted at /media/usb (kioskctl usb umount when done)" ;;
+                  umount) sync; umount /media/usb && log "unmounted" ;;
+                  *) usage; exit 1 ;;
               esac ;;
     update)   cmd_update ;;
     version)  cmd_version ;;

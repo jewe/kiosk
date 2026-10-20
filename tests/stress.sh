@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# re-exec with bash when started with sh
+[ -n "${BASH_VERSION:-}" ] || exec bash "$0" "$@"
 # Usage simulation: random clicks, drags, scrolls and keys on the kiosk screen for N minutes
 # while sampling the memory of all app processes. Mouse events only (xdotool); a touchscreen
 # produces the same clicks in the browser.
@@ -9,6 +11,9 @@ set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../lib/common.sh"
 LOG_TAG="stress"
 minutes="${1:-10}"; eps="${2:-2}"
+[[ "$minutes" =~ ^[0-9]+([.][0-9]+)?$ ]] || die "minutes must be a number (got '$minutes')"
+secs="$(awk -v m="$minutes" 'BEGIN {printf "%d", m*60}')"
+[ "$(id -u)" -eq 0 ] || [ "$(id -un)" = "$KIOSK_USER" ] || die "run as root (sudo kioskctl test stress) or as $KIOSK_USER"
 export DISPLAY=:0 XAUTHORITY="/home/${KIOSK_USER}/.Xauthority"
 xset q >/dev/null 2>&1 || die "X not reachable"
 read -r sw sh _ _ < <(/opt/kiosksystem/display/screen-geometry.sh all)
@@ -18,7 +23,7 @@ echo "ts,rss_mb,events,restarts" > "$csv"
 restarts() { local t=0; for u in $(systemctl list-units --plain --no-legend 'kiosk-*@*.service' | awk '{print $1}'); do t=$((t + $(systemctl show -p NRestarts --value "$u"))); done; echo "$t"; }
 rss_mb() { ps -u "$KIOSK_USER" -o rss= 2>/dev/null | awk '{s+=$1} END {printf "%d", s/1024}'; }
 
-end=$(( $(date +%s) + minutes*60 )); events=0; last_sample=0; r0="$(restarts)"
+end=$(( $(date +%s) + secs )); events=0; last_sample=0; r0="$(restarts)"
 log "running ${minutes} min at ${eps} events/s on ${sw}x${sh}, csv: $csv"
 while [ "$(date +%s)" -lt "$end" ]; do
     x=$(( RANDOM % sw )); y=$(( RANDOM % sh ))

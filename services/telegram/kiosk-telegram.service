@@ -1,0 +1,9 @@
+[Unit]
+Description=Kiosk: send a screenshot to Telegram
+After=kiosk.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/kiosksystem/services/telegram/send.sh
+TimeoutStartSec=90

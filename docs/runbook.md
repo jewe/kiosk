@@ -41,6 +41,9 @@ sudo kioskctl storage init      # creates the kiosk-data LV from free VG space
 | unlock for changes | `sudo kioskctl mount rw`, reboot; afterwards `sudo kioskctl mount locked`, reboot |
 | small change while locked | `sudo mount -o remount,rw /run/rootfsbase && sudo chroot /run/rootfsbase`, edit, exit, `sudo mount -o remount,ro /run/rootfsbase` |
 | update system scripts | `sudo kioskctl update` (needs rw) |
+| screenshot | `sudo kioskctl screenshot` (file) or `sudo kioskctl screenshot --telegram` |
+| copy files from a USB stick | `sudo kioskctl usb mount`, copy from `/media/usb`, `sudo kioskctl usb umount`; or on screen `sudo kioskctl files` (caja, after `tools/install.sh mate`) |
+| release a version | `tools/release.sh patch` on the Mac, then `sudo kioskctl update` on the devices |
 
 ## Troubleshooting
 

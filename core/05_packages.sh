@@ -7,7 +7,7 @@ LOG_TAG="packages"
 apt_install \
     yq jq curl wget ca-certificates gnupg \
     pciutils usbutils lm-sensors lvm2 \
-    htop nano less \
+    htop nano less scrot \
     network-manager autossh \
     pipewire pipewire-pulse wireplumber alsa-utils
 

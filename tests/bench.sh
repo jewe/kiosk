@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# re-exec with bash when started with sh
+[ -n "${BASH_VERSION:-}" ] || exec bash "$0" "$@"
 # Benchmarks. Results go to /opt/kiosk/data/bench/ and the journal (tag kiosk-bench).
 #   bench.sh gpu          glmark2 (windowed, ~2 min)
 #   bench.sh motionmark   opens MotionMark in a Chrome window for 5 minutes; read the score on screen
@@ -10,6 +12,7 @@ what="${1:-info}"
 export DISPLAY=:0 XAUTHORITY="/home/${KIOSK_USER}/.Xauthority"
 out="${KIOSK_DIR}/data/bench"; mkdir -p "$out"; ts="$(date +%Y%m%d-%H%M%S)"
 xk() { if [ "$(id -u)" -eq 0 ]; then sudo -u "$KIOSK_USER" env DISPLAY=:0 XAUTHORITY="$XAUTHORITY" "$@"; else "$@"; fi; }
+[ "$(id -u)" -eq 0 ] || [ "$(id -un)" = "$KIOSK_USER" ] || die "run as root: sudo kioskctl bench $what"
 
 case "$what" in
     info)
