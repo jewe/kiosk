@@ -52,4 +52,4 @@ sudo kioskctl storage init      # creates the kiosk-data LV from free VG space
 - Xorg does not start as user kiosk: check `/etc/X11/Xwrapper.config` has `allowed_users=anybody`, and the kiosk user is in `video`, `input`, `tty`.
 - nvidia: `nvidia-smi`, and `/var/log/Xorg.0.log` for the composition pipeline line. `ubuntu-drivers devices` lists the recommended driver.
 - Touch mapped to the wrong screen: `DISPLAY=:0 xinput list`, set `touch.output` in the config, `sudo kioskctl display`.
-- On-site keyboard: Ctrl+Alt+F2 gives a text console (login as kioskadmin). Ctrl+Alt+Backspace is disabled.
+- On-site keyboard: see `shortcuts.md`. Ctrl+Alt+F2 gives a text console (login as kioskadmin), Ctrl+Alt+F1 returns to the kiosk. Ctrl+Alt+Backspace is disabled.

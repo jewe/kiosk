@@ -34,4 +34,4 @@ Manual OS install without autoinstall: install Ubuntu Server, then run `bootstra
 | `tools/` | dev-tools installer |
 | `branding/` | boot theme, backgrounds |
 | `secrets.example/` | templates for device secrets |
-| `docs/` | requirements, architecture, open questions |
+| `docs/` | requirements, architecture, runbook, config reference, shortcuts, open questions |
