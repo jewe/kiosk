@@ -63,11 +63,12 @@ render_app_env() {
 
 # cursor_show / cursor_hide: the kiosk session hides the pointer (unclutter-xfixes); dev tools need it
 cursor_show() {
-    pkill -u "$KIOSK_USER" -x unclutter-xfixes 2>/dev/null || true
+    # -x cannot match names longer than 15 characters; match the start of the command line instead
+    pkill -u "$KIOSK_USER" -f '^unclutter-xfixes' 2>/dev/null || true
     sudo -u "$KIOSK_USER" env "${XENV[@]}" xsetroot -cursor_name left_ptr 2>/dev/null || true
 }
 cursor_hide() {
-    pgrep -u "$KIOSK_USER" -x unclutter-xfixes >/dev/null && return 0
+    pgrep -u "$KIOSK_USER" -f '^unclutter-xfixes' >/dev/null && return 0
     sudo -u "$KIOSK_USER" env "${XENV[@]}" sh -c 'unclutter-xfixes --start-hidden --hide-on-touch --timeout 1 --fork >/dev/null 2>&1' || true
 }
 
