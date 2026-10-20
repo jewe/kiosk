@@ -8,7 +8,7 @@
 4. `sudo /opt/kiosksystem/apps/web/install.sh`.
 5. `sudo nano /opt/kiosk/config/kiosk.yaml`: set the URL, screens, touch output. `sudo kioskctl apply`.
 6. `sudo reboot`. The kiosk comes up on tty1 with Chrome fullscreen.
-7. `kioskctl status`, `kioskctl doctor`.
+7. `kioskctl status`, `kioskctl doctor`. Every command is explained by `kioskctl help <command>`.
 8. Going to production: `sudo kioskctl mount locked` (or `data`, `data+journal`) and reboot.
 
 ## Manual install without autoinstall

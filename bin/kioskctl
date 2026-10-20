@@ -6,36 +6,169 @@ LOG_TAG="kioskctl"
 
 usage() {
     cat <<'U'
-Usage: kioskctl <command>
+Usage: kioskctl <command> [args]        kioskctl help <command> for details and examples
 
-  status [--json]            summary of this kiosk
+Status and health
+  status [--json]            summary of this kiosk (apps, display, services, memory, disks)
+  doctor                     check every component
   history [N]                last N metric lines from the journal (default 20)
   metrics                    collect metrics now (JSON)
   heartbeat                  send a heartbeat now
-  doctor                     check every component
-  apply                      validate kiosk.yaml and apply apps, display, persistence config
+  version                    system version and git revision
+
+Configuration
+  apply                      validate kiosk.yaml and apply apps, display, services, extensions
   app list|start|stop|restart|logs|update [name]
   display                    re-apply screen layout and touch mapping now
+  extension list|update [id]|id <name>   Chrome extensions (config chrome.extensions)
+  secrets git-key [label]|tunnel-key|list   deploy keys and the tunnel key
+  update                     git pull system repo, re-run setup, re-apply
+
+Persistence
   storage status|init [SIZE] persistent volume for /opt/kiosk (default 20G)
   mount <rw|locked|data|data+journal>   set persistence mode (reboot required)
-  schedule on|off|sync       run a scheduler action now
-  test stress [min] [eps]    simulate usage, sample memory (tests/stress.sh)
-  bench info|gpu|motionmark  benchmarks (tests/bench.sh); bench ab "<flags A>" "<flags B>" compares two Chrome flag sets
-  devmode on|off             escape hotkeys in the session (Ctrl+Alt+T terminal), reconfigures openbox
-  screenshot [file]          save a screenshot (default /opt/kiosk/data/screenshots/)
-  screenshot --telegram [caption]   send a screenshot to the configured Telegram chat
-  files [dir]                open caja on the kiosk screen with a visible cursor (needs tools/install.sh mate)
-  cursor show|hide           show or hide the mouse pointer
+
+On site
+  wifi status|scan|connect <ssid> [psk] [--hidden]|forget|on|off
   usb list|mount [dev]|umount  USB sticks: list, mount at /media/usb, unmount
-  wifi status|scan           on-site WLAN: show link / list networks
-  wifi connect <ssid> [psk] [--hidden]   join a WLAN now (profile 'onsite', asks for the key if omitted)
-  wifi forget|on|off         drop the on-site profile / radio on or off
-  extension list|update [id]|id <name>   Chrome extensions (config chrome.extensions, docs/extensions.md)
-  secrets git-key [label]    generate/show a deploy key for a private repo (label e.g. menu-app, menu-data)
-  secrets tunnel-key|list    show the tunnel key / list all public keys
-  update                     git pull system repo, re-run setup, re-apply
-  version
+  files [dir]                open caja on the kiosk screen with a visible cursor
+  cursor show|hide           show or hide the mouse pointer
+  devmode on|off             escape hotkeys in the session (Ctrl+Alt+T terminal)
+  screenshot [file]|--telegram [caption]   save a screenshot / send it to Telegram
+  schedule on|off|sync       run a scheduler action now
+
+Tests
+  test stress [min] [eps]    simulate usage, sample memory (tests/stress.sh)
+  bench info|gpu|motionmark|ab "<flags A>" "<flags B>"   benchmarks (tests/bench.sh)
 U
+}
+
+cmd_help() {
+    local c="${1:-}"
+    case "$c" in
+        "") usage ;;
+        status) cat <<'H'
+kioskctl status [--json]
+  One screen with everything about this kiosk: version, persistence mode, session state, apps and
+  their units, outputs, enabled services, WLAN, memory and disk space. --json prints the same as one
+  JSON object (the heartbeat sends this).
+H
+;;      doctor) cat <<'H'
+kioskctl doctor
+  Runs one check per component (config, user, X, session, apps, timers, persistence, extensions) and
+  prints ok/FAIL per line. Exit code 1 when anything failed. "tty1 is the active console" fails when a
+  text console is active: switch back with chvt 1 or kioskctl display.
+H
+;;      history|metrics|heartbeat) cat <<'H'
+kioskctl history [N]        last N lines of the metrics the monitor timer writes (journal tag kiosk-monitor)
+kioskctl metrics            collect the metrics now and print the JSON (temperatures, load, memory, disks, restarts)
+kioskctl heartbeat          send the metrics to services.monitoring.url now (needs the token in secrets/monitoring.env)
+  Benchmark results are in the journal too: journalctl -t kiosk-bench
+H
+;;      apply) cat <<'H'
+sudo kioskctl apply
+  Reads /opt/kiosk/config/kiosk.yaml and makes the system match it: app env files and units, Chrome
+  options and extensions, display layout (live when X runs), services (performance, audio, wifi, tunnel,
+  usb, security, scheduler, telegram, monitoring). Restarts the app units. The persistence mode is only
+  reported, switch it with kioskctl mount. Reference of every key: docs/config.md
+H
+;;      app) cat <<'H'
+kioskctl app list                      apps from the config with unit name and state
+kioskctl app start|stop|restart <name>
+kioskctl app logs <name>               last 100 journal lines of the unit
+sudo kioskctl app update <name>        pull the app and data repos of a static app now
+  Units are kiosk-<type>@<name>.service under kiosk.target. Example: sudo kioskctl app restart menu
+H
+;;      display) cat <<'H'
+kioskctl display
+  Re-applies display.outputs (xrandr) and the touch mapping on the running X server and switches back to
+  tty1 if a text console was active. Prints the connected outputs with their geometry.
+H
+;;      extension|ext) cat <<'H'
+kioskctl extension list            published extensions: id, version, served by nginx, source
+sudo kioskctl extension update [id]   download Web Store extensions again (then: kioskctl apply)
+kioskctl extension id <name>       ID of a private extension (derived from its key)
+  Configure in kiosk.yaml under chrome.extensions (name: for a folder in /opt/kiosk/extensions/src,
+  id: for a Web Store extension) and run sudo kioskctl apply. Details: docs/extensions.md
+H
+;;      secrets) cat <<'H'
+sudo kioskctl secrets git-key [label]   create or show a deploy key (secrets/git/<label> or id_ed25519); add it
+                                        read-only on GitHub. One deploy key per repo: use <app>-app and <app>-data
+sudo kioskctl secrets tunnel-key        show the public key of the SSH tunnel
+sudo kioskctl secrets list              list every public key
+  Secrets live in /opt/kiosk/secrets (root, 0600). Copy them to or from your machine with tools/secrets.sh.
+H
+;;      update) cat <<'H'
+sudo kioskctl update
+  git pull in /opt/kiosksystem, re-run setup.sh, then kioskctl apply. Refused while the root is overlaid
+  (locked or data mode): run sudo kioskctl mount rw, reboot, update, then set the mode again.
+H
+;;      storage) cat <<'H'
+kioskctl storage status           is /opt/kiosk a separate volume, size and usage
+sudo kioskctl storage init [SIZE] create the LVM volume for /opt/kiosk (default 20G), move the data, add to fstab
+  Needed for data and data+journal mode. Done by the autoinstall on new devices.
+H
+;;      mount) cat <<'H'
+sudo kioskctl mount <mode>; reboot
+  rw            everything writable (setup, updates)
+  data          root read-only overlay, /opt/kiosk persistent (config, secrets, app repos, bench results)
+  data+journal  like data, plus the journal on /opt/kiosk/logs/journal
+  locked        everything volatile, the device boots to the same state every time
+  The mode is written to the kernel command line via a GRUB drop-in; kioskctl works inside an active
+  overlay through a chroot into the real root. Current mode: kioskctl status.
+H
+;;      wifi) cat <<'H'
+kioskctl wifi status                        wifi device, link, signal, IP
+sudo kioskctl wifi scan                     networks in range
+sudo kioskctl wifi connect <ssid> [psk] [--hidden]   join now; asks for the key when omitted. Profile "onsite",
+                                            priority below the service WLANs from network.wifi
+sudo kioskctl wifi forget                   remove the onsite profile
+sudo kioskctl wifi on|off                   radio
+  Service WLANs for every site go into network.wifi + secrets/wifi.env instead (kioskctl apply).
+H
+;;      usb) cat <<'H'
+sudo kioskctl usb list            USB block devices
+sudo kioskctl usb mount [dev]     mount the first USB partition (or dev) at /media/usb, owned by the kiosk user
+sudo kioskctl usb umount          sync and unmount
+  Blocked while security.disable_usb_storage is on. On-screen alternative: kioskctl files
+H
+;;      files|cursor) cat <<'H'
+sudo kioskctl files [dir]         open caja on the kiosk screen (default /opt/kiosk) with the cursor visible;
+                                  needs tools/install.sh mate. Close it with Ctrl+Alt+Q in dev mode
+sudo kioskctl cursor show|hide    show or hide the mouse pointer (unclutter)
+H
+;;      devmode) cat <<'H'
+sudo kioskctl devmode on|off
+  on: openbox hotkeys Ctrl+Alt+T (terminal), Ctrl+Alt+F (files), Ctrl+Alt+C (Chrome window), Ctrl+Alt+Q
+  (close window), Alt+Tab, Alt+drag; cursor visible. off: production, no hotkeys. See docs/shortcuts.md
+H
+;;      screenshot) cat <<'H'
+sudo kioskctl screenshot [file]              PNG of the whole screen (default /opt/kiosk/data/screenshots/<ts>.png)
+sudo kioskctl screenshot --telegram [caption] send it to services.telegram.chat_id (token in secrets/telegram.env)
+  The kiosk-telegram.timer sends one at boot and every services.telegram.interval when enabled.
+H
+;;      schedule) cat <<'H'
+sudo kioskctl schedule on|off|sync
+  Run the scheduler action now (off_action: screen = DPMS off, apps = stop apps, shutdown). sync applies
+  the state the schedule says for the current time. Times: schedule: in kiosk.yaml, timers from apply.
+H
+;;      test) cat <<'H'
+sudo kioskctl test stress [minutes] [events/s]
+  Random clicks, drags, scrolls and keys on the kiosk screen (xdotool), memory sampled every 30 s to
+  /opt/kiosk/data/stress/*.csv. PASS = no app restarts and memory growth under 10 %. Default 10 min, 5 ev/s.
+H
+;;      bench) cat <<'H'
+sudo kioskctl bench info              GPU, driver, VA-API, clocks, and Chrome's chrome://gpu feature status
+sudo kioskctl bench gpu               glmark2 fullscreen, about 8 minutes
+sudo kioskctl bench motionmark        MotionMark with the production Chrome flags, about 6 minutes, score via DevTools
+sudo kioskctl bench ab "" "--enable-features=Vulkan" [rounds]   two flag sets alternating, prints both medians
+  The apps are stopped during a run. Results: /opt/kiosk/data/bench/, journal tag kiosk-bench.
+  Levers and reference scores: docs/performance.md
+H
+;;      version) echo "kioskctl version    VERSION file and git revision of /opt/kiosksystem" ;;
+        help) echo "kioskctl help [command]   this overview, or details of one command" ;;
+        *) echo "unknown command '$c'"; usage; return 1 ;;
+    esac
 }
 
 XENV=(DISPLAY=:0 XAUTHORITY="/home/${KIOSK_USER}/.Xauthority")
@@ -419,6 +552,7 @@ cmd_wifi() {
     esac
 }
 
+[ "${2:-}" = "--help" ] || [ "${2:-}" = "-h" ] && { cmd_help "$1"; exit 0; }
 case "${1:-}" in
     status)   shift; cmd_status "$@" ;;
     history)  shift; cmd_history "$@" ;;
@@ -484,6 +618,6 @@ case "${1:-}" in
     extension|ext) "${KIOSK_SYS}/apps/web/extensions.sh" "${@:2}" ;;
     update)   cmd_update ;;
     version)  cmd_version ;;
-    -h|--help|help|"") usage ;;
+    -h|--help|help|"") cmd_help "${2:-}" ;;
     *) usage; exit 1 ;;
 esac
