@@ -10,7 +10,7 @@ Status: milestones 1 and 2 implemented and tested on the first device (Lenovo, I
 2. Connect over SSH (`ssh kioskadmin@<hostname>`). The repo is already cloned to `/opt/kiosksystem` by the installer.
 3. Run `sudo /opt/kiosksystem/setup.sh` for the base system: cleanup, kiosk user, security, performance, display stack, default config.
 4. Install the app types you need, e.g. `sudo /opt/kiosksystem/apps/static/install.sh` (web, static, video, slideshow, launcher).
-5. Edit `/opt/kiosk/config/kiosk.yaml`, place secrets in `/opt/kiosk/secrets/`, then `sudo kioskctl apply`.
+5. Edit `/opt/kiosk/config/kiosk.yaml`. Secrets: fill `secrets/common/` and `secrets/<hostname>/` on your machine (git-ignored, templates in `secrets.example/`) and push them with `tools/secrets.sh push <hostname> kioskadmin@<ip>`, which also runs `kioskctl apply`.
 6. Optional: `sudo /opt/kiosksystem/tools/install.sh` for dev tools with checkboxes.
 7. For production: `sudo kioskctl storage init` (if the install did not create the persistent volume), choose the persistence mode with `sudo kioskctl mount locked` (or `data`, `data+journal`), reboot.
 

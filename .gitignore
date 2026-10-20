@@ -2,3 +2,5 @@ autoinstall/out/
 *.img
 *.dmg
 .DS_Store
+secrets/*
+!secrets/README.md

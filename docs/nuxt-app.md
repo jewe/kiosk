@@ -55,7 +55,7 @@ sudo kioskctl secrets git-key menu-data    # add to the data repo
 sudo kioskctl apply
 ```
 
-With the GitHub CLI on your machine: `gh repo deploy-key add key.pub -R you/menu-app -t kiosk-01`. For a fleet, a machine user with read access to both repos and one key per kiosk in that user's SSH keys avoids two keys per device; then `kioskctl secrets git-key` without a label is the shared fallback key. `kioskctl app update menu` pulls immediately, `kioskctl app logs menu` and `journalctl -u kiosk-content-update@menu` show what happened.
+`tools/secrets.sh pull kiosk-01 kioskadmin@<ip>` keeps a copy of the generated keys on your machine. With the GitHub CLI: `gh repo deploy-key add key.pub -R you/menu-app -t kiosk-01`. For a fleet, a machine user with read access to both repos and one key per kiosk in that user's SSH keys avoids two keys per device; then `kioskctl secrets git-key` without a label is the shared fallback key. `kioskctl app update menu` pulls immediately, `kioskctl app logs menu` and `journalctl -u kiosk-content-update@menu` show what happened.
 
 Persistence: content pulled while the kiosk runs in `locked` mode lives in RAM and is pulled again after a reboot. Devices whose content changes should run in `data` mode (`sudo kioskctl mount data`), where `/opt/kiosk` persists.
 
