@@ -25,7 +25,7 @@ case "$what" in
     gpu)
         command -v glmark2 >/dev/null || apt_install glmark2
         log "glmark2 running (about 2 minutes)"
-        xk glmark2 --fullscreen --annotate 2>/dev/null | tee "$out/glmark2-$ts.txt" | grep -i 'glmark2 Score\|GL_RENDERER'
+        xk stdbuf -oL glmark2 --fullscreen --annotate 2>&1 | tee "$out/glmark2-$ts.txt" | grep -i 'glmark2 Score\|GL_RENDERER\|error'
         score="$(grep -o 'glmark2 Score: [0-9]*' "$out/glmark2-$ts.txt" | awk '{print $3}')"
         logger -t kiosk-bench -- "{\"test\":\"glmark2\",\"score\":${score:-null},\"file\":\"$out/glmark2-$ts.txt\"}"
         log "glmark2 score: ${score:-?}" ;;

@@ -4,8 +4,8 @@ Small items not yet decided. Each has a proposed default that will be used unles
 
 | # | Question | Proposed default | Status |
 |---|---|---|---|
-| 1 | App rollback: keep a "last known good" copy of the app repo and switch with a symlink? | Not in the first version. Add when a bad update has actually happened once. | open |
-| 2 | journald retention in `data+journal` mode | 90 days, 500 MB cap, `SyncIntervalSec=5min` | open |
+| 1 | App rollback: keep a "last known good" copy of the app repo and switch with a symlink? | Not in the first version. Add when a bad update has actually happened once. | ok |
+| 2 | journald retention in `data+journal` mode | 90 days, 500 MB cap, `SyncIntervalSec=5min` | ok |
 | 3 | Stress-test pass criteria | implemented in tests/stress.sh: no app restarts, memory growth under 10 % first vs last quarter | done |
 | 4 | Benchmark numbers that matter | glmark2 automated (`kioskctl bench gpu`); MotionMark only opened in Chrome, score read on screen. Automating it needs the DevTools protocol | partly |
 | 5 | Heartbeat interval to the external receiver | 5 minutes, `services.monitoring.interval` | done |
