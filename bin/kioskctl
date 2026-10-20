@@ -94,8 +94,9 @@ cmd_status() {
         apps+=("$n:$(systemctl is-active "$(app_unit "$n")" 2>/dev/null || echo unknown)")
     done
     if [ "$json" -eq 1 ]; then
-        printf '{"device":"%s","version":"%s","uptime":"%s","persistence":"%s","overlay_active":"%s","ip":"%s","cpu_temp":"%s","session":"%s","apps":[' \
-            "$host" "$ver" "$up" "$mode" "$ov" "$ip" "$temp" "$session"
+        printf '{"device":"%s","version":"%s","uptime":"%s","persistence":"%s","overlay_active":"%s","ip":"%s","cpu_temp":"%s","session":"%s","services":{"tunnel":%s,"usb_action":%s,"monitoring":%s,"telegram":%s,"scheduler":%s},"apps":[' \
+            "$host" "$ver" "$up" "$mode" "$ov" "$ip" "$temp" "$session" \
+            "$(cfg '.services.tunnel.enabled' false)" "$(cfg '.services.usb_action.enabled' false)" "$(cfg '.services.monitoring.enabled' false)" "$(cfg '.services.telegram.enabled' false)" "$(cfg '.services.scheduler.enabled' false)"
         local first=1
         for a in "${apps[@]}"; do
             [ $first -eq 1 ] || printf ','
@@ -111,9 +112,21 @@ cmd_status() {
     echo "ip:           ${ip:-none}"
     echo "cpu temp:     ${temp:-n/a}"
     echo "session:      $session"
-    echo "tunnel:       $(systemctl is-enabled kiosk-tunnel.service 2>/dev/null || true) / $(systemctl is-active kiosk-tunnel.service 2>/dev/null || true)"
-    echo "schedule:     $([ -f "${KIOSK_STATE}/schedule" ] && cat "${KIOSK_STATE}/schedule" || echo off), next: $(systemctl list-timers --no-legend --no-pager 'kiosk-schedule-*' 2>/dev/null | awk '{print $1" "$2" "$3" "$NF}' | sed 's/.service//' | head -2 | paste -sd';' -)"
-    echo "wifi:         $(nmcli -t -f NAME,DEVICE con show --active 2>/dev/null | grep '^kiosk-' | cut -d: -f1 | paste -sd' ' - || true)"
+    echo "services:"
+    svc_line() {  # svc_line <label> <unit> <config-flag>: shows config state and unit state
+        local st; st="$(systemctl is-active "$2" 2>/dev/null || true)"
+        [ "$3" = "true" ] && printf '  %-16s on   %s\n' "$1" "$st" || printf '  %-16s off\n' "$1"
+    }
+    svc_line tunnel        kiosk-tunnel.service   "$(cfg '.services.tunnel.enabled' false)"
+    svc_line app-update    "kiosk-content-update@*.timer" "$(systemctl list-timers --no-legend 'kiosk-content-update@*' 2>/dev/null | grep -q . && echo true || echo false)"
+    svc_line usb-action    "" "$(cfg '.services.usb_action.enabled' false)"
+    svc_line monitoring    kiosk-monitor.timer    "$(cfg '.services.monitoring.enabled' false)"
+    svc_line telegram      kiosk-telegram.timer   "$(cfg '.services.telegram.enabled' false)"
+    svc_line scheduler     kiosk-schedule-on.timer "$(cfg '.services.scheduler.enabled' false)"
+    [ "$(cfg '.services.scheduler.enabled' false)" = true ] && echo "    state $([ -f "${KIOSK_STATE}/schedule" ] && cat "${KIOSK_STATE}/schedule" || echo -), next: $(systemctl list-timers --no-legend --no-pager 'kiosk-schedule-*' 2>/dev/null | awk '{print $1" "$2" "$3" "$NF}' | sed 's/.service//' | head -2 | paste -sd';' -)"
+    echo "wifi:         $(cfg '.network.wifi | join(" ")' none) | active: $(nmcli -t -f NAME,DEVICE con show --active 2>/dev/null | grep '^kiosk-' | cut -d: -f1 | paste -sd' ' - || true)"
+    echo "usb storage:  $([ "$(cfg '.security.disable_usb_storage' false)" = true ] && echo disabled || echo enabled)"
+    echo "devmode:      $([ -f "${KIOSK_STATE}/devmode" ] && echo on || echo off)"
     echo "apps:"
     for a in "${apps[@]}"; do printf '  %-16s %s\n' "${a%%:*}" "${a#*:}"; done
     if x_running; then
