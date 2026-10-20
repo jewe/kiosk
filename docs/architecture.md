@@ -87,7 +87,7 @@ Rules that hold in every mode:
 ### D7. Remote access and external monitoring
 
 - autossh reverse tunnel, SSH only, optional. Server, port and key come from config and secrets. Installed and enabled only when `services.tunnel.enabled` is true.
-- External monitoring is push-based so it works behind NAT. The device POSTs `kioskctl status --json` every N minutes to a URL from config. Receiver: a single-file endpoint in `server/` that stores the last JSON per device and shows a plain HTML table. Uptime Kuma's push monitor is a zero-code alternative. No alerting.
+- External monitoring is push-based so it works behind NAT. The device POSTs `kioskctl status --json` every N minutes to a URL from config. Receiver: a single-file endpoint in `server/` that stores the last JSON per device and shows a plain HTML table. Uptime Kuma's push monitor is a zero-code alternative. No alerting. Which existing project to use for history and alerts is open question #15.
 
 ### D8. Local monitoring: journald only
 
