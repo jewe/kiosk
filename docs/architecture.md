@@ -130,6 +130,8 @@ Extensions are installed through the policy `ExtensionInstallForcelist`, which w
 
 Background: the `--load-extension` flag for unpacked folders is ignored by branded Chrome since version 137, so the policy route is the supported way.
 
+Implemented in `apps/web/extensions.sh` (`chrome.extensions` in the config, `kioskctl extension`): Web Store extensions are downloaded once and served locally as well, so a kiosk with a tmpfs profile reinstalls them at every start without internet. Details: `docs/extensions.md`.
+
 ## Components
 
 ```text

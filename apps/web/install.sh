@@ -16,6 +16,7 @@ fi
 # Chrome adds its own apt repo; updates only happen via `kioskctl update`.
 
 install -d -m 0755 /etc/opt/chrome/policies/managed
+apt_install nginx unzip curl   # extensions are served from 127.0.0.1:8090 (apps/web/extensions.sh)
 install -m 0644 "${KIOSK_SYS}/apps/web/policies.json" /etc/opt/chrome/policies/managed/kiosk.json
 
 install -m 0644 "${KIOSK_SYS}/apps/web/kiosk-web@.service" /etc/systemd/system/

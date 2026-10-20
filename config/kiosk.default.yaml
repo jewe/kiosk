@@ -54,6 +54,9 @@ apps:
 chrome:
   gpu: auto                  # auto | software (--disable-gpu, only for broken drivers)
   flags: []                  # extra Chrome flags for every web/static app, e.g. ["--enable-features=Vulkan"]
+  extensions: []             # force-installed extensions, see docs/extensions.md
+  # - name: hello            # private: source in /opt/kiosk/extensions/src/hello, key in secrets/extensions/hello.pem
+  # - id: cjpalhdlnbpafiamejdnhcphjbkeiagm   # Web Store ID: downloaded once, then served locally
 
 performance:
   gpu_min_freq: auto         # auto | max | <MHz>: Intel GPU clock floor (max = no ramp-up jitter, more heat)

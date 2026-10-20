@@ -30,6 +30,7 @@ Usage: kioskctl <command>
   wifi status|scan           on-site WLAN: show link / list networks
   wifi connect <ssid> [psk] [--hidden]   join a WLAN now (profile 'onsite', asks for the key if omitted)
   wifi forget|on|off         drop the on-site profile / radio on or off
+  extension list|update [id]|id <name>   Chrome extensions (config chrome.extensions, docs/extensions.md)
   secrets git-key [label]    generate/show a deploy key for a private repo (label e.g. menu-app, menu-data)
   secrets tunnel-key|list    show the tunnel key / list all public keys
   update                     git pull system repo, re-run setup, re-apply
@@ -175,6 +176,9 @@ cmd_doctor() {
     check "ufw active"                      "ufw status | grep -q 'Status: active'"
     check "sensors available"               "sensors"
     check "monitor timer enabled"           "systemctl is-enabled kiosk-monitor.timer"
+    if [ -f /etc/opt/chrome/policies/managed/kiosk-extensions.json ]; then
+        check "all forced extensions are served" "(for u in \$(jq -r '.ExtensionInstallForcelist[]' /etc/opt/chrome/policies/managed/kiosk-extensions.json | cut -d';' -f2); do curl -fsI --max-time 2 \"\$u\" >/dev/null || exit 1; done)"
+    fi
     echo "  $ok ok, $bad failed"
     [ "$bad" -eq 0 ]
 }
@@ -192,6 +196,9 @@ cmd_apply() {
     cg="$(cfg '.chrome.gpu' auto)"; cf="$(cfg '(.chrome.flags // []) | join(" ")')"
     case "$cg" in auto|software) ;; *) warn "chrome.gpu must be auto or software"; cg=auto ;; esac
     printf 'CHROME_GPU=%s\nCHROME_FLAGS="%s"\n' "$cg" "${cf//\"/\\\"}" | write_file "${KIOSK_STATE}/chrome.env" 0644 || true
+    if [ -f /etc/systemd/system/kiosk-web@.service ] || [ -f /etc/systemd/system/kiosk-static@.service ]; then
+        "${KIOSK_SYS}/apps/web/extensions.sh" apply || problems=1
+    fi
     count="$(cfg '.apps | length' 0)"
     for ((i=0; i<count; i++)); do
         n="$(cfg ".apps[$i].name")"; t="$(cfg ".apps[$i].type")"
@@ -474,6 +481,7 @@ case "${1:-}" in
                   *) usage; exit 1 ;;
               esac ;;
     wifi)     cmd_wifi "${@:2}" ;;
+    extension|ext) "${KIOSK_SYS}/apps/web/extensions.sh" "${@:2}" ;;
     update)   cmd_update ;;
     version)  cmd_version ;;
     -h|--help|help|"") usage ;;

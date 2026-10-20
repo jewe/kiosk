@@ -1,0 +1,2 @@
+{ "manifest_version": 3, "name": "Kiosk hello", "version": "1.0", "description": "test extension: red border on every page",
+  "content_scripts": [ { "matches": ["<all_urls>"], "js": ["content.js"], "run_at": "document_end" } ] }
