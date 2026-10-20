@@ -42,6 +42,7 @@ sudo kioskctl storage init      # creates the kiosk-data LV from free VG space
 | small change while locked | `sudo mount -o remount,rw /run/rootfsbase && sudo chroot /run/rootfsbase`, edit, exit, `sudo mount -o remount,ro /run/rootfsbase` |
 | update system scripts | `sudo kioskctl update` (needs rw) |
 | screenshot | `sudo kioskctl screenshot` (file) or `sudo kioskctl screenshot --telegram` |
+| join a WLAN on site | `sudo kioskctl wifi scan`, `sudo kioskctl wifi connect <ssid>` (asks for the key); `kioskctl wifi status`; `sudo kioskctl wifi forget` when done |
 | copy files from a USB stick | `sudo kioskctl usb mount`, copy from `/media/usb`, `sudo kioskctl usb umount`; or on screen `sudo kioskctl files` (caja, after `tools/install.sh mate`) |
 | secrets to a device | `tools/secrets.sh push kiosk-01 kioskadmin@<ip>` from the Mac (`secrets/common/` + `secrets/kiosk-01/`); `pull` saves device-generated keys back |
 | release a version | patch bumps with every commit (hook); `tools/release.sh minor` on the Mac for a minor release, then `sudo kioskctl update` on the devices |

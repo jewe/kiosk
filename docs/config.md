@@ -15,7 +15,7 @@ Apply with `sudo kioskctl apply`. Unknown keys are ignored. Everything has a def
 | type `slideshow` | `path` (directory), `interval` (seconds per image, 10) |
 | type `launcher` | `command` (run with bash -c), `wm_class` (optional, to find the window), `workdir` |
 | type `static` | `path` (directory to serve) or `repo` + `branch` + `subdir` (app build, cloned to `/opt/kiosk/apps/<name>/repo`); optional `data_repo` + `data_branch` + `data_subdir` served under `data_url` (`/data`) with `Cache-Control: no-cache`; `update_on_boot`, `update_interval` (0 = off), `on_app_change` (restart), `on_data_change` (reload); `port` (127.0.0.1 only, 8080), `extra_flags`. SPA fallback to index.html is on. Private repos use per-repo deploy keys from `kioskctl secrets git-key <name>-app` / `<name>-data` (fallback: the unlabelled key). See `docs/nuxt-app.md` |
-| `network.wifi[]` | up to three service WLAN names in priority order; `WIFI_<NAME>_SSID` / `WIFI_<NAME>_PSK` in `secrets/wifi.env` |
+| `network.wifi[]` | up to three service WLAN names in priority order; `WIFI_<NAME>_SSID` / `WIFI_<NAME>_PSK` in `secrets/wifi.env`. For a one-off on-site network use `kioskctl wifi connect <ssid>` instead (profile `onsite`, lower priority) |
 | `services.tunnel` | `enabled`, `host`, `port` (22), `user` (tunnel), `remote_port` (20022). Key in `secrets/tunnel/`, public key printed by apply |
 | `services.usb_action` | `enabled`; action script `/opt/kiosk/usb-action.sh` |
 | `services.monitoring` | `enabled` (heartbeat), `url`, `interval` (5m, also the local metrics interval). Token in `secrets/monitoring.env` |

@@ -27,6 +27,9 @@ Usage: kioskctl <command>
   files [dir]                open caja on the kiosk screen with a visible cursor (needs tools/install.sh mate)
   cursor show|hide           show or hide the mouse pointer
   usb list|mount [dev]|umount  USB sticks: list, mount at /media/usb, unmount
+  wifi status|scan           on-site WLAN: show link / list networks
+  wifi connect <ssid> [psk] [--hidden]   join a WLAN now (profile 'onsite', asks for the key if omitted)
+  wifi forget|on|off         drop the on-site profile / radio on or off
   secrets git-key [label]    generate/show a deploy key for a private repo (label e.g. menu-app, menu-data)
   secrets tunnel-key|list    show the tunnel key / list all public keys
   update                     git pull system repo, re-run setup, re-apply
@@ -358,6 +361,52 @@ cmd_update() {
     log "update done; reboot recommended"
 }
 
+# ---------- wifi (on-site) ----------
+# Profile "onsite" sits below the configured service WLANs (priority 50) and is not managed by services/wifi.
+cmd_wifi() {
+    command -v nmcli >/dev/null || die "NetworkManager (nmcli) not installed"
+    local sub="${1:-status}"; shift || true
+    case "$sub" in
+        status)
+            nmcli -t -f WIFI g radio | grep -q enabled || warn "radio is off (kioskctl wifi on)"
+            nmcli -f DEVICE,TYPE,STATE,CONNECTION dev status | awk 'NR==1 || $2=="wifi"'
+            local dev; dev="$(nmcli -t -f DEVICE,TYPE dev status | awk -F: '$2=="wifi" {print $1; exit}')"
+            [ -n "$dev" ] || { warn "no wifi device"; return 0; }
+            nmcli -t -f ACTIVE,SSID,SIGNAL,RATE,SECURITY dev wifi list ifname "$dev" 2>/dev/null | awk -F: '$1=="yes" {printf "link:   %s  signal %s%%  %s  %s\n", $2, $3, $4, $5}'
+            nmcli -t -f IP4.ADDRESS,IP4.GATEWAY dev show "$dev" | sed 's/^IP4\./ip4 /; s/:/ = /' ;;
+        scan)
+            require_root
+            nmcli dev wifi rescan >/dev/null 2>&1 || true; sleep 2
+            nmcli -f IN-USE,SSID,SIGNAL,CHAN,SECURITY dev wifi list ;;
+        connect)
+            require_root
+            local ssid="" psk="" hidden=no a
+            for a in "$@"; do case "$a" in --hidden) hidden=yes ;; *) if [ -z "$ssid" ]; then ssid="$a"; else psk="$a"; fi ;; esac; done
+            [ -n "$ssid" ] || die "usage: kioskctl wifi connect <ssid> [psk] [--hidden]"
+            nmcli radio wifi on
+            if [ -z "$psk" ] && [ -t 0 ]; then
+                read -r -s -p "key for '$ssid' (empty = open network): " psk; echo
+            fi
+            nmcli con delete onsite >/dev/null 2>&1 || true
+            nmcli dev wifi rescan >/dev/null 2>&1 || true
+            nmcli con add type wifi con-name onsite ifname '*' ssid "$ssid" \
+                connection.autoconnect yes connection.autoconnect-priority 50 wifi.hidden "$hidden" >/dev/null
+            if [ -n "$psk" ]; then
+                nmcli con modify onsite wifi-sec.key-mgmt wpa-psk wifi-sec.psk "$psk" >/dev/null
+            fi
+            if nmcli -w 30 con up onsite >/dev/null; then
+                log "connected to '$ssid'"; cmd_wifi status
+                [ "$(persistence_mode)" = rw ] || [ "$(persistence_mode)" = data ] || warn "persistence $(persistence_mode): the profile is gone after a reboot"
+            else
+                nmcli con delete onsite >/dev/null 2>&1 || true
+                die "could not connect to '$ssid' (wrong key, out of range, or hidden: add --hidden)"
+            fi ;;
+        forget) require_root; nmcli con delete onsite >/dev/null 2>&1 && log "profile onsite removed" || warn "no onsite profile" ;;
+        on|off) require_root; nmcli radio wifi "$sub"; log "radio $sub" ;;
+        *) usage; exit 1 ;;
+    esac
+}
+
 case "${1:-}" in
     status)   shift; cmd_status "$@" ;;
     history)  shift; cmd_history "$@" ;;
@@ -419,6 +468,7 @@ case "${1:-}" in
                   umount) sync; umount /media/usb && log "unmounted" ;;
                   *) usage; exit 1 ;;
               esac ;;
+    wifi)     cmd_wifi "${@:2}" ;;
     update)   cmd_update ;;
     version)  cmd_version ;;
     -h|--help|help|"") usage ;;
