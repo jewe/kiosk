@@ -130,6 +130,7 @@ cmd_doctor() {
     check "kiosk.target enabled"            "systemctl is-enabled kiosk.target"
     check "kiosk-session active"            "systemctl is-active kiosk-session.service"
     check "X server reachable"              "x_running"
+    check "tty1 is the active console"      "[ \"\$(fgconsole 2>/dev/null)\" = 1 ]"
     for n in $(app_names); do
         local u; u="$(app_unit "$n")"
         check "unit template for app '$n' installed" "[ -f /etc/systemd/system/${u%%@*}@.service ]"
@@ -184,6 +185,7 @@ cmd_apply() {
 
     # --- display: live re-apply when X is up, restart apps ---
     if x_running; then
+        [ "$(fgconsole 2>/dev/null)" = 1 ] || { chvt 1 && log "switched back to tty1 (a text console was active)"; }
         as_kiosk_x "${KIOSK_SYS}/display/apply-display.sh" || true
         if systemctl is-active kiosk.target >/dev/null 2>&1; then
             for u in "${wanted[@]:-}"; do [ -n "$u" ] && systemctl restart "$u" || true; done
@@ -224,6 +226,8 @@ cmd_app() {
 
 cmd_display() {
     x_running || die "X is not running"
+    # a text console left active (Ctrl+Alt+F2) pauses X: nothing renders, new windows never map
+    if [ "$(fgconsole 2>/dev/null)" != 1 ]; then chvt 1 && log "switched back to tty1"; fi
     as_kiosk_x "${KIOSK_SYS}/display/apply-display.sh"
 }
 

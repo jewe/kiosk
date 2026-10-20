@@ -12,4 +12,4 @@ tmp="$(mktemp --suffix=.png)"
 [ "$(id -u)" -eq 0 ] && chown "$KIOSK_USER" "$tmp"     # scrot runs as the kiosk user and must write the file
 if command -v scrot >/dev/null; then run scrot -o "$tmp" 2>/dev/null; else run import -window root "$tmp" 2>/dev/null; fi
 [ -s "$tmp" ] || { rm -f "$tmp"; echo "screenshot failed (X not reachable?)" >&2; exit 1; }
-mv -f "$tmp" "$out" && echo "$out"
+chmod 644 "$tmp"; mv -f "$tmp" "$out" && echo "$out"

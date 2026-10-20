@@ -47,6 +47,7 @@ sudo kioskctl storage init      # creates the kiosk-data LV from free VG space
 
 ## Troubleshooting
 
+- Screen frozen, screenshots fail, new windows never appear: a text console is active (someone pressed Ctrl+Alt+F2). `sudo kioskctl display` or `sudo chvt 1` switches back; `kioskctl doctor` reports it.
 - Black screen, no Chrome: `journalctl -u kiosk-session -b`, then `journalctl -u 'kiosk-web@*' -b`.
 - Xorg does not start as user kiosk: check `/etc/X11/Xwrapper.config` has `allowed_users=anybody`, and the kiosk user is in `video`, `input`, `tty`.
 - nvidia: `nvidia-smi`, and `/var/log/Xorg.0.log` for the composition pipeline line. `ubuntu-drivers devices` lists the recommended driver.
