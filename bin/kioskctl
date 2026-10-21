@@ -695,7 +695,7 @@ case "${1:-}" in
                       # labelled <app>-app and <app>-data; without label the shared fallback key id_ed25519.
                       d="${KIOSK_SECRETS}/git"; install -d -m 0700 "$d"; touch "$d/known_hosts"
                       # --rsa: 4096-bit RSA for old GitLab/Gitea servers that do not accept ed25519 keys
-                      local ktype=ed25519 kargs=(); [ "${3:-}" = "--rsa" ] && { shift; ktype=rsa; kargs=(-b 4096); }
+                      ktype=ed25519; kargs=(); [ "${3:-}" = "--rsa" ] && { shift; ktype=rsa; kargs=(-b 4096); }
                       [ "${4:-}" = "--rsa" ] && { ktype=rsa; kargs=(-b 4096); }
                       k="${3:-id_ed25519}"; [[ "$k" =~ ^[a-z0-9_-]+$ ]] || die "label must be [a-z0-9_-]"
                       [ -f "$d/$k" ] || { ssh-keygen -q -t "$ktype" "${kargs[@]}" -N "" -C "kiosk-$(hostname)-$k" -f "$d/$k"; log "git deploy key '$k' generated ($ktype)"; }
