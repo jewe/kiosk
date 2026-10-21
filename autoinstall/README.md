@@ -16,3 +16,10 @@ What the template does: SSH key-only admin user, `git` + `lvm2`, no snaps, GPT w
 `out/` is git-ignored because it contains the password hash and your public key.
 
 The repo URL (`--repo`, default `https://github.com/jewe/kiosk.git`) must be reachable without credentials, i.e. public, or carry a read-only token (`https://TOKEN@github.com/...`). If the clone fails the install still completes and leaves `/root/KIOSK-CLONE-FAILED`; then run `bootstrap.sh` over SSH.
+
+## Offline install
+
+The install itself needs no network: everything comes from the ISO. git and the clone of this repo are done in
+late-commands only when the network is up; otherwise `/root/KIOSK-NO-NETWORK` or `/root/KIOSK-CLONE-FAILED` is left
+behind and you run `bootstrap.sh` after plugging in the cable (or `kioskctl wifi connect` once the repo is there).
+A failed package download used to abort the install with `install_git ... returned non-zero exit status 100`.

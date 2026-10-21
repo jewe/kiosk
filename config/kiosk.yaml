@@ -1,0 +1,113 @@
+# Kiosk configuration. Copied to /opt/kiosk/config/kiosk.yaml by setup.sh.
+# Apply changes with:  sudo kioskctl apply
+# Reference: docs/config.md
+
+device:
+  id: ""                     # empty = hostname
+
+display:
+  tearfree: true             # Xorg TearFree (modesetting/amdgpu); false = a little more throughput, possible tearing
+  background: /opt/kiosksystem/branding/backgrounds/black.jpg
+  outputs: []                # empty = xrandr --auto. Example:
+  # - name: HDMI-1
+  #   primary: true
+  #   mode: 1920x1080
+  #   pos: 0x0
+  #   rotate: normal         # normal|left|right|inverted
+  # - name: DP-1
+  #   pos: 1920x0
+  # - name: HDMI-2
+  #   enabled: false
+  #   transform: "1,0,0,0,1,0,0,0,1"   # optional 3x3 keystone matrix (xrandr --transform)
+
+touch:
+  output: ""                 # map the touchscreen to this output name, e.g. HDMI-1
+
+audio:
+  sink: ""                   # empty = default sink
+  volume: 70
+
+apps:
+  - name: main
+    type: web
+    url: https://example.org
+    screen: primary          # primary | all | output name
+    geometry: fullscreen     # fullscreen | WxH+X+Y relative to the screen
+    extra_flags: ""          # extra Chrome flags
+  # - name: menu             # static site served by nginx on 127.0.0.1 (e.g. nuxt generate output), see docs/nuxt-app.md
+  #   type: static
+  #   path: /opt/kiosk/apps/menu/site    # directory with index.html (when no repo)
+  #   repo: git@github.com:you/menu-app.git   # app build; private repos: kioskctl secrets git-key
+  #   branch: build
+  #   subdir: ""                         # directory inside the repo to serve
+  #   data:                              # up to 5 data repos, each served under its own URL
+  #     - name: data                     # URL /data, checkout /opt/kiosk/apps/menu/repos/data, key secrets/git/menu-data
+  #       repo: git@github.com:you/menu-data.git
+  #       branch: main
+  #       subdir: ""                     # optional folder inside the repo
+  #       url: /data                     # default /<name>
+  #       lfs: false                     # true = pull the Git LFS objects of the current commit (large files)
+  #       on_change: reload              # reload | restart | none
+  #     - name: videos
+  #       repo: git@github.com:you/menu-videos.git
+  #       lfs: true
+  #       on_change: none
+  #   update_on_boot: true               # pull both repos at boot
+  #   update_interval: 15m               # and periodically (0 = off)
+  #   on_app_change: restart             # restart | reload | none
+  #   port: 8080
+  #   screen: primary
+
+chrome:
+  gpu: auto                  # auto | software (--disable-gpu, only for broken drivers)
+  flags: []                  # extra Chrome flags for every web/static app, e.g. ["--enable-features=Vulkan"]
+  extensions: []             # force-installed extensions, see docs/extensions.md
+  # - name: hello            # private: source in /opt/kiosk/extensions/src/hello, key in secrets/extensions/hello.pem
+  # - id: cjpalhdlnbpafiamejdnhcphjbkeiagm   # Web Store ID: downloaded once, then served locally
+
+performance:
+  gpu_min_freq: auto         # auto | max | <MHz>: Intel GPU clock floor (max = no ramp-up jitter, more heat)
+  low_latency: false         # true = shallow CPU C-states (kernel option, reboot); try if frame times are jittery
+
+network:
+  wifi: []                   # up to 3 names; credentials in /opt/kiosk/secrets/wifi.env
+
+services:
+  tunnel:
+    enabled: false
+    host: ""
+    port: 22
+    user: tunnel
+    remote_port: 20022
+  app_update:
+    enabled: false
+    repo: ""
+    branch: main
+    path: /opt/kiosk/apps/content
+  usb_action:
+    enabled: false
+  monitoring:
+    enabled: false
+    url: ""
+    interval: 5m
+  scheduler:
+    enabled: false
+  health:
+    enabled: false           # restart an app whose window is missing, blank or not served; see docs/health.md
+    interval: 2m
+    checks: [window, title, http]   # optional: screen (flat-colour detection, needs imagemagick)
+    min_stddev: 3
+  updates:
+    enabled: false           # unattended Ubuntu updates (needs rw mode); Chrome stays pinned
+    security_only: true
+    reboot: ""               # "03:30" = reboot at that time when a package asks for it; "" = never
+
+schedule: {}
+  # mon-fri: { on: "07:30", off: "19:00" }
+  # sat:     { on: "09:00", off: "16:00" }
+
+security:
+  disable_usb_storage: false
+
+persistence:
+  mode: rw                   # rw | locked | data | data+journal   (applied with: sudo kioskctl mount <mode>)
