@@ -35,13 +35,13 @@ gc_repo() {
     kb="$(du -sk "$dir/.git" 2>/dev/null | cut -f1)"
     [ "${kb:-0}" -gt 51200 ] || return 0
     g -C "$dir" reflog expire --expire=now --all 2>/dev/null
-    g -C "$dir" gc -q --prune=now 2>/dev/null && log "$name: $(basename "$dir") gc, .git now $(du -sh "$dir/.git" | cut -f1)"
+    g -C "$dir" gc -q --prune=now 2>/dev/null && log "$name: $(basename "$dir") gc, .git now $(du -sh "$dir/.git" | cut -f1)" >&2
 }
 
 # lfs_sync <dir>: objects of the checked-out commit only
 lfs_sync() {
     local dir="$1"
-    command -v git-lfs >/dev/null || { warn "$name: lfs=true but git-lfs is not installed (apt install git-lfs)"; return 1; }
+    command -v git-lfs >/dev/null || apt_install git-lfs >&2 || { warn "$name: lfs=true but git-lfs could not be installed"; return 1; }
     g -C "$dir" config lfs.fetchrecentrefsdays 0; g -C "$dir" config lfs.fetchrecentcommitsdays 0; g -C "$dir" config lfs.pruneoffsetdays 0
     timeout 1800 git -C "$dir" -c safe.directory='*' lfs pull 2>/dev/null || { warn "$name: lfs pull failed in $dir"; return 1; }
     timeout 600 git -C "$dir" -c safe.directory='*' lfs prune -f >/dev/null 2>&1 || true
@@ -72,7 +72,7 @@ sync_repo() {
 write_state() {  # write_state <repo> <dir> <result> <lfs>
     local commit="" size=0
     [ -d "$2/.git" ] && commit="$(g -C "$2" rev-parse --short HEAD 2>/dev/null)" && size="$(du -sm "$2" 2>/dev/null | cut -f1)"
-    jq -n --arg name "$1" --arg commit "$commit" --arg ts "$(date -Is)" --arg result "${3%% *}" --argjson size "${size:-0}" --argjson lfs "$4" \
+    jq -n --arg name "$1" --arg commit "$commit" --arg ts "$(date -u -Is)" --arg result "${3%% *}" --argjson size "${size:-0}" --argjson lfs "$4" \
         '{name:$name, commit:$commit, ts:$ts, result:$result, size_mb:$size, lfs:$lfs}' > "$appdir/state/$1.json"
 }
 

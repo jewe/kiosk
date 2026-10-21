@@ -33,7 +33,7 @@ publish() {   # publish <id> <crx> <version>
 XML
 }
 
-pack_private() {   # pack_private <name> → prints id, or returns 1
+pack_private() {   # pack_private <name> → sets EXT_ID, or returns 1
     local name="$1" src="$SRC/$name" key="$KEYS/$name.pem" id crx ver tmp
     [[ "$name" =~ ^[a-z0-9_-]+$ ]] || { warn "extension name '$name' must be [a-z0-9_-]"; return 1; }
     [ -f "$src/manifest.json" ] || { warn "extension '$name': no $src/manifest.json"; return 1; }
@@ -52,7 +52,7 @@ pack_private() {   # pack_private <name> → prints id, or returns 1
         else rm -rf "$tmp"; warn "extension '$name': packing failed (google-chrome --pack-extension)"; return 1; fi
         rm -rf "$tmp"
     fi
-    echo "$id"
+    EXT_ID="$id"
 }
 
 fetch_store() {   # fetch_store <id> [force] → 0 if a crx is published
@@ -96,7 +96,7 @@ apply() {
     [ "$n" -gt 0 ] && ensure_nginx
     for ((i=0; i<n; i++)); do
         name="$(cfg ".chrome.extensions[$i].name")"; id="$(cfg ".chrome.extensions[$i].id")"
-        if [ -n "$name" ]; then id="$(pack_private "$name")" || continue
+        if [ -n "$name" ]; then EXT_ID=""; pack_private "$name" || continue; id="$EXT_ID"
         elif [ -n "$id" ]; then fetch_store "$id" || continue
         else warn "chrome.extensions[$i]: needs name or id"; continue; fi
         ids+=("$id")

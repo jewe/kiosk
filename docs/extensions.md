@@ -29,7 +29,7 @@ The 32-letter ID from the Web Store URL. On the first apply the `.crx` is downlo
 - `/opt/kiosk/extensions/pub/<id>/<id>.crx` and `update.xml` are served by nginx on `127.0.0.1:8090` with the content type `application/x-chrome-extension`.
 - `/etc/opt/chrome/policies/managed/kiosk-extensions.json` lists every ID in `ExtensionInstallForcelist` with the local update URL, and sets `override_update_url` in `ExtensionSettings` so Chrome never looks at the manifest's own update URL.
 - Entries removed from the config are removed from the policy and from `pub/` at the next apply. The policy file disappears when the list is empty.
-- The forced install is asynchronous: for about a second after Chrome starts the page runs without the extension. A page that depends on the extension should wait for it (for example a message from the content script) instead of assuming it at load time.
+- The forced install is asynchronous: the page loads first, the extension arrives a moment later, and Chrome does **not** inject content scripts into a page that was already open. An extension with content scripts therefore reloads the open tabs once in its `chrome.runtime.onInstalled` handler (see `background.js` in the example). A page that talks to the extension should also tolerate its absence for the first second.
 - Persistence: `pub/` and the keys live under `/opt/kiosk`, so they survive reboots in `data` mode. In `locked` mode they are rebuilt from the sources at every apply after boot; without internet a Web Store entry is then missing until the next `rw`/`data` apply.
 
 ## Check
