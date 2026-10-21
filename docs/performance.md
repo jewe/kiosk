@@ -20,7 +20,7 @@ Chrome flags (`apps/web/chrome-flags.sh`, used by the apps and by the benchmark)
 
 - rendering on the GPU: `--enable-gpu-rasterization --enable-zero-copy --enable-native-gpu-memory-buffers`, features `CanvasOopRasterization`, `VaapiVideoDecodeLinuxGL`, `VaapiIgnoreDriverChecks`, `--ignore-gpu-blocklist`
 - no throttling of covered windows: `--disable-renderer-backgrounding --disable-background-timer-throttling --disable-backgrounding-occluded-windows` (several apps per screen overlap; without these a partly covered window runs its timers at 1 Hz)
-- no background work: `--disable-background-networking --disable-component-update --disable-sync --disable-breakpad --metrics-recording-only`, features `MediaRouter`, `OptimizationHints`, `Translate` off
+- no background work: `--disable-component-update --disable-sync --disable-breakpad --metrics-recording-only`, features `MediaRouter`, `OptimizationHints`, `Translate` off
 - `--ozone-platform=x11 --force-device-scale-factor=1`
 - `--enable-features=` / `--disable-features=` from `chrome.flags` and `apps[].extra_flags` are merged into one flag each (Chrome only honours the last one)
 
