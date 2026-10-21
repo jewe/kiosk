@@ -34,7 +34,7 @@ chrome_flags() {
         --disable-background-timer-throttling
         --disable-backgrounding-occluded-windows
         # no background work: a kiosk is never signed in and never updates itself
-        --disable-background-networking
+        # (--disable-background-networking is NOT used: it also stops policy-forced extension installs)
         --disable-component-update
         --disable-sync
         --disable-breakpad

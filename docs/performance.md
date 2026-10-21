@@ -33,7 +33,7 @@ System: performance governor and `energy_performance_preference=performance` bef
 | Key | Effect | Cost |
 |---|---|---|
 | `chrome.flags: ["--enable-features=Vulkan"]` | Vulkan instead of GL for compositing and raster. Faster on some Intel/AMD drivers, unstable on others. Try with `bench ab` first | crashes or black windows on bad drivers |
-| `display.tearfree: false` | removes the extra per-frame copy of the DDX. A few percent more throughput | possible tearing on scrolls; Chrome is vsynced itself, so in a fullscreen kiosk it is usually invisible. Needs `sudo systemctl restart kiosk-session` |
+| `display.tearfree: false` | removes the extra per-frame copy of the DDX. A few percent more throughput. Note: the modesetting driver of Xorg on Ubuntu 26.04 logs `Option "TearFree" is not used`, so on Intel this switch currently has no effect either way | possible tearing on scrolls; Chrome is vsynced itself, so in a fullscreen kiosk it is usually invisible. Needs `sudo systemctl restart kiosk-session` |
 | `performance.gpu_min_freq: max` | Intel GPU never clocks down: no ramp-up jitter on bursty animation | heat and power; the clock is visible in `kioskctl metrics` as `gpu_mhz` |
 | `performance.low_latency: true` | kernel options `intel_idle.max_cstate=1 processor.max_cstate=1`, less wake-up latency for touch and animation. Reboot | heat and power. Only if frame times are jittery |
 | `chrome.gpu: software` | `--disable-gpu`. Only for broken drivers | everything on the CPU |
@@ -42,7 +42,7 @@ System: performance governor and `energy_performance_preference=performance` bef
 
 | Device | glmark2 | MotionMark | Notes |
 |---|---|---|---|
-| kiosk-01, Intel UHD 730, Ubuntu 26.04 | 1174 | *to be measured* | default flags; measure before and after the flag change (commit "Chrome performance") |
+| kiosk-01, Intel UHD 730, Ubuntu 26.04, Chrome 155 | 1174 | 1819 (2026-10-21) | default flags of 0.2.19, offline MotionMark copy, 1920x1080. chrome://gpu: canvas, raster, compositing, video decode, WebGL hardware accelerated; Vulkan and Graphite off |
 
 ## When a page is slow
 
