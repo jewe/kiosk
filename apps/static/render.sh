@@ -47,8 +47,13 @@ for ((j=0; j<count; j++)); do
         add_header Cache-Control \"no-cache\";
     }"
 done
+# missing checkouts are cloned by the content-update unit in the background: a large repo must not block
+# apply for an hour. nginx answers 404 under the data URL until the clone is there; the app is restarted
+# by update.sh when its own repo arrives.
 if [ "$need_sync" = 1 ]; then
-    "${KIOSK_SYS}/apps/static/update.sh" "$name" || warn "clone failed for '${name}'; retried at boot / by the timer or with: kioskctl app update ${name}"
+    systemctl start --no-block "kiosk-content-update@${name}.service" 2>/dev/null \
+        && log "$name: cloning missing repos in the background (journalctl -u kiosk-content-update@${name} -f)" \
+        || warn "could not start kiosk-content-update@${name}; run: sudo kioskctl app update ${name}"
 fi
 
 write_file "/etc/nginx/sites-available/kiosk-${name}.conf" <<NGX || true
