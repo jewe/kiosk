@@ -21,9 +21,10 @@ autoinstall:
     allow-pw: false
     authorized-keys:
       - "__SSH_KEY__"
-  # no "packages:" here: anything not on the ISO (git) needs the network, and a failed download aborts the
-  # whole install. git is installed in late-commands when the network is up, otherwise by bootstrap.sh later.
-  packages: []
+  packages:                  # git is not on the ISO: the install needs the network (checked in early-commands)
+    - git
+    - lvm2
+    - curl
   snaps: []
   updates: security
   storage:
@@ -48,8 +49,21 @@ autoinstall:
       - {type: lvm_partition, id: lv-data, volgroup: vg0, name: kiosk-data, size: __DATA_SIZE__, preserve: false}
       - {type: format, id: fs-data, volume: lv-data, fstype: ext4, label: kiosk-data, preserve: false}
       - {type: mount, id: mount-data, device: fs-data, path: /opt/kiosk, options: "defaults,noatime"}
+  # Abort right away with a readable message when there is no network: the package step (git) would
+  # otherwise fail after the whole system is installed, with only "install_git ... exit status 100" to go by.
+  early-commands:
+    - |
+      for i in $(seq 1 30); do curl -fsI -m 5 http://archive.ubuntu.com/ubuntu/ >/dev/null 2>&1 && exit 0; sleep 2; done
+      {
+        echo "=================================================================="
+        echo " KIOSK AUTOINSTALL ABORTED: no network after 60 s."
+        echo " The install needs the Ubuntu mirror (git). Plug in Ethernet, check"
+        echo " the link light, then reboot from the stick. Nothing was written."
+        echo " Interfaces:"; ip -br link; ip -br addr
+        echo "=================================================================="
+      } | tee /dev/tty1 /dev/console
+      exit 1
   late-commands:
-    - curtin in-target --target=/target -- bash -c 'apt-get install -y git curl >/dev/null 2>&1 || echo "git not installed during install (no network); run bootstrap.sh" > /root/KIOSK-NO-NETWORK'
-    - curtin in-target --target=/target -- bash -c 'command -v git >/dev/null && git clone __REPO_URL__ /opt/kiosksystem || echo "clone of __REPO_URL__ failed during install; run bootstrap.sh" > /root/KIOSK-CLONE-FAILED'
+    - curtin in-target --target=/target -- bash -c 'git clone __REPO_URL__ /opt/kiosksystem || echo "clone of __REPO_URL__ failed during install; run bootstrap.sh" > /root/KIOSK-CLONE-FAILED'
     - curtin in-target --target=/target -- bash -c 'echo "__USERNAME__ ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/90-kioskadmin && chmod 440 /etc/sudoers.d/90-kioskadmin'
     - curtin in-target --target=/target -- bash -c 'sed -i "s/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT=\"quiet splash loglevel=3\"/; s/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=1/" /etc/default/grub && update-grub'

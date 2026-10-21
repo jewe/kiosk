@@ -17,9 +17,10 @@ What the template does: SSH key-only admin user, `git` + `lvm2`, no snaps, GPT w
 
 The repo URL (`--repo`, default `https://github.com/jewe/kiosk.git`) must be reachable without credentials, i.e. public, or carry a read-only token (`https://TOKEN@github.com/...`). If the clone fails the install still completes and leaves `/root/KIOSK-CLONE-FAILED`; then run `bootstrap.sh` over SSH.
 
-## Offline install
+## Network is required
 
-The install itself needs no network: everything comes from the ISO. git and the clone of this repo are done in
-late-commands only when the network is up; otherwise `/root/KIOSK-NO-NETWORK` or `/root/KIOSK-CLONE-FAILED` is left
-behind and you run `bootstrap.sh` after plugging in the cable (or `kioskctl wifi connect` once the repo is there).
-A failed package download used to abort the install with `install_git ... returned non-zero exit status 100`.
+The install pulls git from the Ubuntu mirror and clones this repo, so the device needs a working Ethernet connection
+with DHCP during the install. An early command checks the mirror for 60 s before the disk is touched and aborts with
+a banner `KIOSK AUTOINSTALL ABORTED: no network` that lists the interfaces (no carrier = cable or NIC driver, carrier
+but no address = DHCP). Plug in the cable and boot the stick again. If you ever see
+`install_git ... returned non-zero exit status 100` late in the log instead, the network went away during the install.
