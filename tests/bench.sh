@@ -22,13 +22,15 @@ BENCH_RES="${BENCH_RES:-1920x1080}"
 xk() { if [ "$(id -u)" -eq 0 ]; then sudo -u "$KIOSK_USER" env DISPLAY=:0 XAUTHORITY="$XAUTHORITY" "$@"; else "$@"; fi; }
 [ "$(id -u)" -eq 0 ] || [ "$(id -un)" = "$KIOSK_USER" ] || die "run as root: sudo kioskctl bench $what"
 
-apps_were_active=0
+# stop the app units for the run and start exactly those again afterwards (starting kiosk.target would not
+# restart units that were stopped while the target stayed active)
+stopped_units=()
 quiet_start() {
-    if systemctl is-active kiosk.target >/dev/null 2>&1; then
-        apps_were_active=1; systemctl stop 'kiosk-*@*.service' 2>/dev/null || true
-    fi
+    local u
+    while read -r u _; do [ -n "$u" ] && stopped_units+=("$u"); done < <(systemctl list-units --plain --no-legend --state=active 'kiosk-*@*.service' 2>/dev/null | grep -v 'kiosk-content-update@')
+    [ ${#stopped_units[@]} -gt 0 ] && systemctl stop "${stopped_units[@]}" 2>/dev/null || true
 }
-quiet_end() { [ "$apps_were_active" = 1 ] && systemctl start kiosk.target 2>/dev/null || true; }
+quiet_end() { [ ${#stopped_units[@]} -gt 0 ] && systemctl start "${stopped_units[@]}" 2>/dev/null || true; stopped_units=(); }
 trap 'rm -f "$BENCH_POLICY"; quiet_end' EXIT
 
 clocks() {   # one JSON object with governor, EPP, GPU clock, CPU temperature
