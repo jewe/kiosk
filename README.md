@@ -34,4 +34,5 @@ Manual OS install without autoinstall: install Ubuntu Server, then run `bootstra
 | `tools/` | dev-tools installer |
 | `branding/` | boot theme, backgrounds |
 | `secrets.example/` | templates for device secrets |
-| `docs/` | requirements, architecture, runbook, config reference, performance, extensions, usb, health, nuxt-app, shortcuts, open questions |
+| `docs/` | not in this repo: the documentation lives in the private repo `jewe/kiosk-docs` (clone it into `docs/`). Paths like `docs/config.md` in `kioskctl help` refer to it |
+| `examples/` | example extension, deploy script for the build branch |
