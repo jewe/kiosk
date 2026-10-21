@@ -78,7 +78,7 @@ unknown("top level"; ["device","display","touch","audio","chrome","performance",
     (if length > 3 then err("network.wifi: at most 3 entries") else empty end),
     (.[] | if (is_name | not) then err("network.wifi: '\(.)' must be [a-z0-9_-]") else empty end)
   end),
-(.services | unknown("services"; ["tunnel","app_update","usb_action","monitoring","telegram","scheduler","health","updates"])),
+(.services | unknown("services"; ["tunnel","usb_action","monitoring","telegram","scheduler","health","updates"])),
 (.services // {} | to_entries[] | .key as $s | .value | if type == "object" then (.enabled | want_bool("services.\($s).enabled")) else err("services.\($s) must be a map") end),
 (.services.tunnel | unknown("services.tunnel"; ["enabled","host","port","user","remote_port"])),
 (.services.tunnel | if .enabled == true and (.host == null or .host == "") then err("services.tunnel.host required when enabled") else empty end),

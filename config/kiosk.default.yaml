@@ -79,11 +79,6 @@ services:
     port: 22
     user: tunnel
     remote_port: 20022
-  app_update:
-    enabled: false
-    repo: ""
-    branch: main
-    path: /opt/kiosk/apps/content
   usb_action:
     enabled: false
   monitoring:
