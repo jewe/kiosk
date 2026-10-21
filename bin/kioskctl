@@ -265,7 +265,7 @@ os_state() {
     fi
     [ -n "${apt_upgradable:-}" ] || apt_upgradable="$(timeout 8 apt-get -s -o Debug::NoLocking=true upgrade 2>/dev/null | grep -c '^Inst ' || echo '?')"
     reboot_required=no; [ -f /run/reboot-required ] && reboot_required=yes
-    system_behind="$(git -C "$KIOSK_SYS" rev-list --count HEAD..@{u} 2>/dev/null || echo '?')"
+    system_behind="$(git -c safe.directory='*' -C "$KIOSK_SYS" rev-list --count HEAD..@{u} 2>/dev/null || echo '?')"
     system_fetched="$(stat -c %y "$KIOSK_SYS/.git/FETCH_HEAD" 2>/dev/null | cut -d. -f1 || true)"
 }
 
