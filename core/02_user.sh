@@ -21,6 +21,8 @@ chmod 0755 "$KIOSK_DIR" "$KIOSK_DIR/config"
 chmod 0700 "$KIOSK_SECRETS"
 
 ln -sfn "${KIOSK_SYS}/bin/kioskctl" /usr/local/bin/kioskctl
+# the system repo is root-owned; let every user run git in it (kioskctl status reads the revision)
+git config --system --get-all safe.directory 2>/dev/null | grep -qx "$KIOSK_SYS" || git config --system --add safe.directory "$KIOSK_SYS"
 
 # the kiosk user may read status, nothing else (sudo forbids wildcards in arguments)
 write_file /etc/sudoers.d/90-kiosk 0440 <<SUDO || true

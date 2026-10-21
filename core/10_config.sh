@@ -17,4 +17,4 @@ for f in "${KIOSK_SYS}"/secrets.example/*.env; do
 done
 
 echo "$(cd "$KIOSK_SYS" && git describe --always --dirty 2>/dev/null || date +%Y%m%d)" > "${KIOSK_DIR}/VERSION"
-kioskctl apply || warn "apply reported problems; fix the config and run: sudo kioskctl apply"
+kioskctl apply || warn "apply reported problems (expected on a fresh install until an app type is installed); after editing the config run: sudo kioskctl apply"
