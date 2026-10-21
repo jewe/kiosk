@@ -46,7 +46,7 @@ clocks() {   # one JSON object with governor, EPP, GPU clock, CPU temperature
 machine() {
     local cpu gpu ram xdrv chrome levers
     cpu="$(lscpu 2>/dev/null | awk -F: '/Model name/ {gsub(/^ +/,"",$2); print $2; exit}')"
-    gpu="$(lspci -nn 2>/dev/null | grep -i 'vga\|3d\|display' | sed 's/^[^:]*: //; s/ (rev.*//; s/ \[[0-9a-f]\{4\}:[0-9a-f]\{4\}\]//' | paste -sd'+' -)"   # all GPUs, e.g. "Intel ... UHD 630+NVIDIA ... RTX 3060"
+    gpu="$(lspci -nn 2>/dev/null | grep -i 'vga\|3d\|display' | sed 's/^.*\]: //; s/ (rev.*//; s/ \[[0-9a-f]\{4\}:[0-9a-f]\{4\}\]//' | paste -sd'+' -)"   # all GPUs, e.g. "Intel ... UHD 630+NVIDIA ... RTX 3060"
     ram="$(free -m | awk '/^Mem:/ {print $2}')"
     xdrv="$(grep -o 'Loading.*/\(modesetting\|intel\|amdgpu\|nvidia\)_drv.so' /var/log/Xorg.0.log 2>/dev/null | tail -1 | sed 's#.*/##; s/_drv.so//')"
     chrome="$(google-chrome-stable --version 2>/dev/null | grep -o '[0-9][0-9.]*' | head -1)"
