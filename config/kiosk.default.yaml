@@ -85,6 +85,11 @@ services:
     enabled: false
     url: ""
     interval: 5m
+  telegram:
+    enabled: false           # screenshot to a Telegram chat; bot token TELEGRAM_BOT_TOKEN in secrets/telegram.env
+    chat_id: ""
+    interval: 60m            # one screenshot every 60 minutes
+    on_boot: true            # and one after each boot
   scheduler:
     enabled: false
   health:
