@@ -304,8 +304,9 @@ status_static_json() {
         --argjson apps "$(yq -c '[.apps[]? | {name, type, screen:(.screen // "primary"), geometry:(.geometry // "fullscreen")}]' "$KIOSK_CONFIG" 2>/dev/null || echo '[]')" \
         --argjson extensions "$(yq -c '(.chrome.extensions // []) | length' "$KIOSK_CONFIG" 2>/dev/null || echo 0)" \
         --argjson screens "$screens" \
+        --argjson bench "$(cat "${KIOSK_DIR}"/data/bench/*.json 2>/dev/null | jq -sc '[.[] | select(.score != null)] | group_by(.test) | map({key: .[0].test, value: (max_by(.ts) | {score, label, ts})}) | from_entries' 2>/dev/null || echo '{}')" \
         '{device:$device, version:$version, os:$os, kernel:$kernel, apt_upgradable:$apt, reboot_required:$reboot, system_behind:$behind,
-          persistence:$mode, overlay_active:$ov, data_volume:$volfs, services:$services, apps:$apps, extensions:$extensions, screens:$screens, ts:(now|todate)}'
+          persistence:$mode, overlay_active:$ov, data_volume:$volfs, services:$services, apps:$apps, extensions:$extensions, screens:$screens, bench:$bench, ts:(now|todate)}'
 }
 status_static_text() {
     local j; j="$(status_static_json)"
@@ -317,7 +318,8 @@ status_static_text() {
       "services:     \([.services | to_entries[] | select(.key != "wifi" and .value == true) | .key] | if length == 0 then "none enabled" else join(", ") end)",
       "wifi:         \(.services.wifi | if length == 0 then "none" else join(" ") end)",
       "apps:         \(.apps | map("\(.name) (\(.type), \(.screen) \(.geometry))") | join(", "))\(if .extensions > 0 then "  | extensions: \(.extensions)" else "" end)",
-      (if (.screens|length) > 0 then "screens:      \(.screens | map("\(.name) \(.geometry)\(if .primary then " (primary)" else "" end)") | join(", "))" else empty end)' <<<"$j"
+      (if (.screens|length) > 0 then "screens:      \(.screens | map("\(.name) \(.geometry)\(if .primary then " (primary)" else "" end)") | join(", "))" else empty end),
+      (if (.bench|length) > 0 then "bench:        \(.bench | to_entries | map("\(.key) \(.value.score) (\(.value.ts | .[0:10]))") | join(", "))" else empty end)' <<<"$j"
 }
 
 # ---- dynamic: what changes while the kiosk runs ----
