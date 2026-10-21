@@ -23,6 +23,8 @@ use_key() {  # use_key <label>: GitHub allows a deploy key on one repository onl
             export GIT_SSH_COMMAND="ssh -i $k -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=${KIOSK_SECRETS}/git/known_hosts -o BatchMode=yes"
             # old git servers accept only ssh-rsa with SHA-1, which modern OpenSSH disables by default
             grep -q '^ssh-rsa' "$k.pub" 2>/dev/null && export GIT_SSH_COMMAND="$GIT_SSH_COMMAND -o PubkeyAcceptedAlgorithms=+ssh-rsa -o HostKeyAlgorithms=+ssh-rsa"
+            # optional per-device ssh config (secrets/git/ssh_config): e.g. reach a git server through a tunnel
+            [ -f "${KIOSK_SECRETS}/git/ssh_config" ] && export GIT_SSH_COMMAND="$GIT_SSH_COMMAND -F ${KIOSK_SECRETS}/git/ssh_config"
             return
         fi
     done
