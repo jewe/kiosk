@@ -45,6 +45,19 @@ lfs_sync() {
     g -C "$dir" config lfs.fetchrecentrefsdays 0; g -C "$dir" config lfs.fetchrecentcommitsdays 0; g -C "$dir" config lfs.pruneoffsetdays 0
     timeout 1800 git -C "$dir" -c safe.directory='*' lfs pull 2>/dev/null || { warn "$name: lfs pull failed in $dir"; return 1; }
     timeout 600 git -C "$dir" -c safe.directory='*' lfs prune -f >/dev/null 2>&1 || true
+    lfs_dedup "$dir"
+}
+# lfs_dedup <dir>: the LFS cache keeps a copy of every checked-out object; replace it with a hard link to the
+# working file so large repos use the disk once. git writes new files instead of editing in place, so the link is safe.
+lfs_dedup() {
+    local dir="$1" oid path obj
+    while read -r oid _ path; do
+        [ -n "$oid" ] && [ -f "$dir/$path" ] || continue
+        obj="$dir/.git/lfs/objects/${oid:0:2}/${oid:2:2}/$oid"
+        [ -f "$obj" ] || continue
+        [ "$obj" -ef "$dir/$path" ] && continue
+        ln -f "$dir/$path" "$obj" 2>/dev/null || true
+    done < <(git -C "$dir" -c safe.directory='*' lfs ls-files -l 2>/dev/null)
 }
 
 # sync_repo <url> <branch> <dir> <lfs>  → echoes cloned|changed|unchanged|failed; one retry after 15 s (boot, flaky link)
@@ -72,6 +85,8 @@ sync_repo_once() {
         # pull when the commit changed or any tracked file is still a pointer ("oid - path" in lfs ls-files)
         if [ "$r" != unchanged ] || ! command -v git-lfs >/dev/null || g -C "$dir" lfs ls-files 2>/dev/null | grep -q '^[0-9a-f]* - '; then
             lfs_sync "$dir" || r=failed
+        else
+            lfs_dedup "$dir"
         fi
     elif [ -f "$dir/.gitattributes" ] && grep -q 'filter=lfs' "$dir/.gitattributes"; then
         warn "$name: $(basename "$dir") uses Git LFS but lfs is not set: large files are pointer stubs"

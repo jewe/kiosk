@@ -9,7 +9,8 @@ usage() {
 Usage: kioskctl <command> [args]        kioskctl help <command> for details and examples
 
 Status and health
-  status [--json]            summary of this kiosk (apps, display, services, memory, disks)
+  status [--json] [--static|--dynamic]   summary of this kiosk (static part: os, config; dynamic: memory, apps)
+  check [file]               validate kiosk.yaml (also run by apply)
   doctor                     check every component
   history [N]                last N metric lines from the journal (default 20)
   metrics                    collect metrics now (JSON)
@@ -17,7 +18,7 @@ Status and health
   version                    system version and git revision
 
 Configuration
-  apply                      validate kiosk.yaml and apply apps, display, services, extensions
+  apply                      check kiosk.yaml and apply apps, display, services, extensions
   app list|start|stop|restart|logs|update [name] [repo]
   display                    re-apply screen layout and touch mapping now
   extension list|update [id]|id <name>   Chrome extensions (config chrome.extensions)
@@ -269,73 +270,97 @@ os_state() {
 }
 
 cmd_status() {
-    local json=0; [ "${1:-}" = "--json" ] && json=1
-    local os_name kernel apt_upgradable reboot_required system_behind system_fetched; os_state
-    local host mode ver up ov ip temp session apps=()
-    host="$(hostname)"; mode="$(persistence_mode)"; ver="$(cmd_version)"
+    # kioskctl status [--json] [--static|--dynamic]
+    local json=0 part=all a
+    for a in "$@"; do case "$a" in --json) json=1 ;; --static) part=static ;; --dynamic) part=dynamic ;; esac; done
+    if [ "$json" -eq 1 ]; then
+        case "$part" in
+            static)  status_static_json ;;
+            dynamic) status_dynamic_json ;;
+            *) jq -c -n --argjson s "$(status_static_json)" --argjson d "$(status_dynamic_json)" '{static:$s, dynamic:$d}' ;;
+        esac
+        return
+    fi
+    echo "=== Kiosk $(hostname) ==="
+    [ "$part" = dynamic ] || status_static_text
+    [ "$part" = static ] || status_dynamic_text
+}
+
+# ---- static: changes only with an update, a config change or a reboot. Heartbeat sends it once a day. ----
+status_static_json() {
+    local os_name kernel apt_upgradable reboot_required system_behind system_fetched ver mode ov screens
+    os_state; ver="$(cmd_version)"; mode="$(persistence_mode)"; ov="$(overlayroot_active && echo yes || echo no)"
+    screens="[]"
+    if x_running; then
+        screens="$(env "${XENV[@]}" xrandr --query 2>/dev/null | awk '/ connected/ {geo=($3=="primary")?$4:$3; printf "%s%s|%s|%s\n", "", $1, geo, ($3=="primary")?"yes":"no"}' \
+            | jq -R -s -c 'split("\n") | map(select(length>0) | split("|") | {name:.[0], geometry:.[1], primary:(.[2]=="yes")})')"
+    fi
+    jq -c -n --arg device "$(hostname)" --arg version "$ver" --arg os "$os_name" --arg kernel "$kernel" \
+        --arg apt "$apt_upgradable" --arg reboot "$reboot_required" --arg behind "$system_behind" \
+        --arg mode "$mode" --arg ov "$ov" --arg volfs "$(findmnt -n -o FSTYPE "$KIOSK_DIR" 2>/dev/null | tail -1 || true)" \
+        --argjson services "$(jq -c '{tunnel:(.services.tunnel.enabled // false), usb_action:(.services.usb_action.enabled // false), monitoring:(.services.monitoring.enabled // false), telegram:(.services.telegram.enabled // false), scheduler:(.services.scheduler.enabled // false), health:(.services.health.enabled // false), updates:(.services.updates.enabled // false), wifi:(.network.wifi // [])}' <(yq -c . "$KIOSK_CONFIG" 2>/dev/null || echo '{}'))" \
+        --argjson apps "$(yq -c '[.apps[]? | {name, type, screen:(.screen // "primary"), geometry:(.geometry // "fullscreen")}]' "$KIOSK_CONFIG" 2>/dev/null || echo '[]')" \
+        --argjson extensions "$(yq -c '(.chrome.extensions // []) | length' "$KIOSK_CONFIG" 2>/dev/null || echo 0)" \
+        --argjson screens "$screens" \
+        '{device:$device, version:$version, os:$os, kernel:$kernel, apt_upgradable:$apt, reboot_required:$reboot, system_behind:$behind,
+          persistence:$mode, overlay_active:$ov, data_volume:$volfs, services:$services, apps:$apps, extensions:$extensions, screens:$screens, ts:(now|todate)}'
+}
+status_static_text() {
+    local j; j="$(status_static_json)"
+    jq -r '
+      "version:      \(.version)\(if (.system_behind|tonumber? // 0) > 0 then " (\(.system_behind) commits behind origin)" else "" end)",
+      "os:           \(.os), kernel \(.kernel)",
+      "updates:      \(.apt_upgradable) packages upgradable\(if .reboot_required == "yes" then ", REBOOT REQUIRED" else "" end)\(if .services.updates then ", unattended on" else "" end)",
+      "persistence:  \(.persistence) (root overlay: \(.overlay_active), /opt/kiosk: \(if .data_volume == "" then "dir on root" else .data_volume end))",
+      "services:     \([.services | to_entries[] | select(.key != "wifi" and .value == true) | .key] | if length == 0 then "none enabled" else join(", ") end)",
+      "wifi:         \(.services.wifi | if length == 0 then "none" else join(" ") end)",
+      "apps:         \(.apps | map("\(.name) (\(.type), \(.screen) \(.geometry))") | join(", "))\(if .extensions > 0 then "  | extensions: \(.extensions)" else "" end)",
+      (if (.screens|length) > 0 then "screens:      \(.screens | map("\(.name) \(.geometry)\(if .primary then " (primary)" else "" end)") | join(", "))" else empty end)' <<<"$j"
+}
+
+# ---- dynamic: what changes while the kiosk runs ----
+status_dynamic_json() {
+    local up ip temp session apps first n
     up="$(uptime -p | sed 's/^up //')"
-    ov="$(overlayroot_active && echo yes || echo no)"
     ip="$(ip -4 -o addr show scope global 2>/dev/null | awk '{print $4}' | paste -sd' ' -)"
     temp="$(sensors 2>/dev/null | awk '/^(Package id 0|Tctl|Core 0|temp1)/ {gsub(/[+°C]/,"",$0); for(i=1;i<=NF;i++) if($i ~ /^[0-9.]+$/) {print $i; exit}}' | head -1)"
     session="$(systemctl is-active kiosk-session.service 2>/dev/null || true)"
+    apps="["; first=1
     for n in $(app_names); do
-        apps+=("$n:$(systemctl is-active "$(app_unit "$n")" 2>/dev/null || echo unknown)")
+        [ $first -eq 1 ] || apps="$apps,"; first=0
+        apps="$apps$(jq -c -n --arg name "$n" --arg state "$(systemctl is-active "$(app_unit "$n")" 2>/dev/null || echo unknown)" \
+            --argjson repos "$(cat "${KIOSK_DIR}/apps/${n}/state"/*.json 2>/dev/null | jq -sc 'map({name,commit,updated:.ts,size_mb,lfs,result})' 2>/dev/null || echo '[]')" \
+            '{name:$name, state:$state, repos:$repos}')"
     done
-    if [ "$json" -eq 1 ]; then
-        printf '{"device":"%s","version":"%s","os":"%s","kernel":"%s","apt_upgradable":"%s","reboot_required":"%s","system_behind":"%s","uptime":"%s","persistence":"%s","overlay_active":"%s","ip":"%s","cpu_temp":"%s","mem_free_mb":%s,"disk_free_root_mb":%s,"disk_free_data_mb":%s,"session":"%s","services":{"tunnel":%s,"usb_action":%s,"monitoring":%s,"telegram":%s,"scheduler":%s},"apps":[' \
-            "$host" "$ver" "$os_name" "$kernel" "$apt_upgradable" "$reboot_required" "$system_behind" "$up" "$mode" "$ov" "$ip" "$temp" \
-            "$(free -m | awk '/^Mem:/ {print $7}')" "$(df -m --output=avail / | tail -1 | tr -d ' ')" "$(df -m --output=avail "$KIOSK_DIR" 2>/dev/null | tail -1 | tr -d ' ' || echo 0)" "$session" \
-            "$(cfg '.services.tunnel.enabled' false)" "$(cfg '.services.usb_action.enabled' false)" "$(cfg '.services.monitoring.enabled' false)" "$(cfg '.services.telegram.enabled' false)" "$(cfg '.services.scheduler.enabled' false)"
-        local first=1
-        for a in "${apps[@]}"; do
-            [ $first -eq 1 ] || printf ','
-            printf '{"name":"%s","state":"%s","repos":%s}' "${a%%:*}" "${a#*:}" "$(cat "${KIOSK_DIR}/apps/${a%%:*}/state"/*.json 2>/dev/null | jq -sc 'map({name,commit,updated:.ts,size_mb,lfs,result})' 2>/dev/null || echo '[]')"; first=0
-        done
-        printf '],"ts":"%s"}\n' "$(date -Is)"
-        return
-    fi
-    echo "=== Kiosk $host ==="
-    echo "version:      $ver$([[ "$system_behind" =~ ^[0-9]+$ ]] && [ "$system_behind" -gt 0 ] && echo " ($system_behind commits behind origin${system_fetched:+, last fetch $system_fetched})")"
-    echo "os:           $os_name, kernel $kernel"
-    echo "updates:      $apt_upgradable packages upgradable$([ "$reboot_required" = yes ] && echo ", REBOOT REQUIRED")"
-    echo "uptime:       $up"
-    echo "persistence:  $mode (root overlay: $ov, /opt/kiosk: $(findmnt -n -o FSTYPE "$KIOSK_DIR" 2>/dev/null | tail -1 || echo "dir on root"))"
-    echo "ip:           ${ip:-none}"
-    echo "cpu temp:     ${temp:-n/a}"
-    echo "memory:       $(free -m | awk '/^Mem:/ {printf "%d MB free of %d MB (%d%% used)", $7, $2, ($2-$7)*100/$2}')"
-    echo "disk:         $(df -h --output=target,avail,size,pcent / "$KIOSK_DIR" 2>/dev/null | awk 'NR>1 {printf "%s %s free of %s (%s used)  ", $1, $2, $3, $4}' | sed 's/  $//')"
-    echo "session:      $session"
-    echo "services:"
-    svc_line() {  # svc_line <label> <unit> <config-flag>: shows config state and unit state
-        local st; st="$(systemctl is-active "$2" 2>/dev/null || true)"
-        [ "$3" = "true" ] && printf '  %-16s on   %s\n' "$1" "$st" || printf '  %-16s off\n' "$1"
-    }
-    svc_line tunnel        kiosk-tunnel.service   "$(cfg '.services.tunnel.enabled' false)"
-    svc_line app-update    "kiosk-content-update@*.timer" "$(systemctl list-timers --no-legend 'kiosk-content-update@*' 2>/dev/null | grep -q . && echo true || echo false)"
-    svc_line usb-action    "" "$(cfg '.services.usb_action.enabled' false)"
-    svc_line monitoring    kiosk-monitor.timer    "$(cfg '.services.monitoring.enabled' false)"
-    svc_line telegram      kiosk-telegram.timer   "$(cfg '.services.telegram.enabled' false)"
-    svc_line scheduler     kiosk-schedule-on.timer "$(cfg '.services.scheduler.enabled' false)"
-    [ "$(cfg '.services.scheduler.enabled' false)" = true ] && echo "    state $([ -f "${KIOSK_STATE}/schedule" ] && cat "${KIOSK_STATE}/schedule" || echo -), next: $(systemctl list-timers --no-legend --no-pager 'kiosk-schedule-*' 2>/dev/null | awk '{print $1" "$2" "$3" "$NF}' | sed 's/.service//' | head -2 | paste -sd';' -)"
-    echo "wifi:         $(cfg '.network.wifi | join(" ")' none) | active: $(nmcli -t -f NAME,DEVICE con show --active 2>/dev/null | grep '^kiosk-' | cut -d: -f1 | paste -sd' ' - || true)"
-    echo "usb storage:  $([ "$(cfg '.security.disable_usb_storage' false)" = true ] && echo disabled || echo enabled)"
-    echo "devmode:      $([ -f "${KIOSK_STATE}/devmode" ] && echo on || echo off)"
-    echo "apps:"
-    for a in "${apps[@]}"; do
-        printf '  %-16s %s\n' "${a%%:*}" "${a#*:}"
-        for f in "${KIOSK_DIR}/apps/${a%%:*}/state"/*.json; do
-            [ -f "$f" ] || continue
-            jq -r --argjson now "$(date +%s)" '
-                def tsec: (.ts | .[0:19] + "Z" | fromdateiso8601) - ((.ts | .[19:]) as $o | if ($o | length) < 6 then 0 else (($o[1:3] | tonumber) * 3600 + ($o[4:6] | tonumber) * 60) * (if $o[0:1] == "-" then -1 else 1 end) end);
-                def ago: (($now - tsec) as $s
-                          | if $s < 90 then "\($s) s ago" elif $s < 5400 then "\($s/60|floor) min ago" elif $s < 172800 then "\($s/3600|floor) h ago" else "\($s/86400|floor) d ago" end);
-                "    \(.name|.+"        "|.[0:8]) \(.commit // "-"|.+"       "|.[0:7]) \(try ago catch "?"|.+"            "|.[0:12]) \(.size_mb|tostring|.+" MB") \(if .lfs then "lfs" else "" end) \(if .result == "failed" then "FAILED" else "" end)"' "$f" 2>/dev/null
-        done
-    done
-    if x_running; then
-        echo "screens:"
-        env "${XENV[@]}" xrandr --query | awk '/ connected/ {geo=($3=="primary")?$4:$3; printf "  %-10s %s %s\n", $1, geo, ($3=="primary")?"(primary)":""}'
-    fi
+    apps="$apps]"
+    jq -c -n --arg up "$up" --arg ip "$ip" --arg temp "$temp" --arg session "$session" \
+        --argjson mem "$(free -m | awk '/^Mem:/ {print $7}')" --argjson memtotal "$(free -m | awk '/^Mem:/ {print $2}')" \
+        --argjson droot "$(df -m --output=avail / | tail -1 | tr -d ' ')" --argjson ddata "$(df -m --output=avail "$KIOSK_DIR" 2>/dev/null | tail -1 | tr -d ' ' || echo 0)" \
+        --arg wifi "$(nmcli -t -f NAME,DEVICE con show --active 2>/dev/null | grep '^kiosk-\|^onsite' | cut -d: -f1 | paste -sd' ' - || true)" \
+        --arg devmode "$([ -f "${KIOSK_STATE}/devmode" ] && echo on || echo off)" \
+        --arg schedule "$([ -f "${KIOSK_STATE}/schedule" ] && cat "${KIOSK_STATE}/schedule" || echo "")" \
+        --argjson units "$(for u in kiosk-tunnel.service kiosk-monitor.timer kiosk-telegram.timer kiosk-schedule-on.timer kiosk-health.timer apt-daily-upgrade.timer; do printf '"%s":"%s",' "${u%%.*}" "$(systemctl is-active "$u" 2>/dev/null || true)"; done | sed 's/,$//; s/^/{/; s/$/}/')" \
+        --argjson apps "$apps" \
+        '{ts:(now|todate), uptime:$up, session:$session, ip:$ip, cpu_temp:($temp|tonumber? // null), mem_free_mb:$mem, mem_total_mb:$memtotal,
+          disk_free_root_mb:$droot, disk_free_data_mb:$ddata, wifi_active:$wifi, devmode:$devmode, schedule:$schedule, units:$units, apps:$apps}'
+}
+status_dynamic_text() {
+    local j; j="$(status_dynamic_json)"
+    jq -r --argjson now "$(date +%s)" '
+      def tsec: (.[0:19] + "Z" | fromdateiso8601) - ((.[19:]) as $o | if ($o | length) < 6 then 0 else (($o[1:3] | tonumber) * 3600 + ($o[4:6] | tonumber) * 60) * (if $o[0:1] == "-" then -1 else 1 end) end);
+      def ago: (($now - tsec) as $s | if $s < 90 then "\($s) s ago" elif $s < 5400 then "\($s/60|floor) min ago" elif $s < 172800 then "\($s/3600|floor) h ago" else "\($s/86400|floor) d ago" end);
+      "uptime:       \(.uptime)",
+      "session:      \(.session)",
+      "ip:           \(if .ip == "" then "none" else .ip end)\(if .wifi_active != "" then "  wifi: \(.wifi_active)" else "" end)",
+      "cpu temp:     \(.cpu_temp // "n/a")",
+      "memory:       \(.mem_free_mb) MB free of \(.mem_total_mb) MB (\(((.mem_total_mb - .mem_free_mb) * 100 / .mem_total_mb) | floor)% used)",
+      "disk free:    / \(.disk_free_root_mb) MB, /opt/kiosk \(.disk_free_data_mb) MB",
+      "units:        \([.units | to_entries[] | select(.value == "active") | .key] | if length == 0 then "none active" else join(", ") end)",
+      (if .schedule != "" then "schedule:     \(.schedule)" else empty end),
+      "devmode:      \(.devmode)",
+      "apps:",
+      (.apps[] | "  \(.name | .+"                " | .[0:16]) \(.state)",
+        (.repos[] | "    \(.name|.+"        "|.[0:8]) \(.commit // "-"|.+"       "|.[0:7]) \(try (.updated | ago) catch "?"|.+"            "|.[0:12]) \(.size_mb|tostring|.+" MB") \(if .lfs then "lfs" else "" end) \(if .result == "failed" then "FAILED" else "" end)"))' <<<"$j"
 }
 
 cmd_history() {
@@ -346,11 +371,22 @@ cmd_history() {
         | awk -F'\t' '{printf "%-25s %6s %6s %5s %5s %5s %6s %s\n", $1,$2,$3,$4,$5,$6,$7,$8}'
 }
 
+# kioskctl check [file]: validate the config (lib/config-check.jq). Exit 1 on errors.
+cmd_check() {
+    local f="${1:-$KIOSK_CONFIG}" out
+    [ -f "$f" ] || die "no config at $f"
+    yq -e '.' "$f" >/dev/null 2>&1 || die "$f is not valid YAML"
+    out="$(yq -c . "$f" | jq -r -f "${KIOSK_SYS}/lib/config-check.jq" 2>&1)" || { echo "$out"; die "validator failed"; }
+    [ -n "$out" ] && echo "$out"
+    if grep -q '^ERROR' <<<"$out"; then echo "config: $(grep -c '^ERROR' <<<"$out") error(s)"; return 1; fi
+    echo "config ok: $f$( [ -n "$out" ] && echo " ($(grep -c '^WARN' <<<"$out") warning(s))")"
+}
+
 cmd_doctor() {
     local ok=0 bad=0
     check() { if eval "$2" >/dev/null 2>&1; then echo "  ok    $1"; ok=$((ok+1)); else echo "  FAIL  $1"; bad=$((bad+1)); fi; }
     echo "doctor:"
-    check "config exists and parses"        "yq -e '.' '$KIOSK_CONFIG'"
+    check "config exists and is valid"      "cmd_check"
     check "kiosk user exists"               "id $KIOSK_USER"
     check "yq installed"                    "command -v yq"
     check "Xorg installed"                  "command -v X"
@@ -382,8 +418,7 @@ cmd_doctor() {
 
 cmd_apply() {
     require_root
-    [ -f "$KIOSK_CONFIG" ] || die "no config at $KIOSK_CONFIG"
-    yq -e '.' "$KIOSK_CONFIG" >/dev/null || die "config is not valid YAML"
+    cmd_check "$KIOSK_CONFIG" || die "fix the config first (kioskctl check)"
     local problems=0 wanted=() n t count i u
 
     # --- apps: render env files, enable/disable instances ---
@@ -434,7 +469,7 @@ cmd_apply() {
 
     # --- services (each reads its own config section) ---
     local svc
-    for svc in performance audio wifi tunnel usb security scheduler telegram; do
+    for svc in performance audio wifi tunnel usb security scheduler telegram health updates; do
         [ -x "${KIOSK_SYS}/services/${svc}/apply.sh" ] || continue
         "${KIOSK_SYS}/services/${svc}/apply.sh" || { warn "service '$svc' apply failed"; problems=1; }
     done
@@ -627,6 +662,7 @@ cmd_wifi() {
 [ "${2:-}" = "--help" ] || [ "${2:-}" = "-h" ] && { cmd_help "$1"; exit 0; }
 case "${1:-}" in
     status)   shift; cmd_status "$@" ;;
+    check)    cmd_check "${2:-}" ;;
     history)  shift; cmd_history "$@" ;;
     metrics)  "${KIOSK_SYS}/monitoring/collect.sh" ;;
     heartbeat) require_root; "${KIOSK_SYS}/monitoring/heartbeat.sh" ;;

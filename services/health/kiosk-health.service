@@ -1,0 +1,7 @@
+[Unit]
+Description=Kiosk: check that every app shows something, restart it if not
+After=kiosk.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/kiosksystem/services/health/check.sh

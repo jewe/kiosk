@@ -25,6 +25,8 @@ Apply with `sudo kioskctl apply`. Unknown keys are ignored. Everything has a def
 | `services.monitoring` | `enabled` (heartbeat), `url`, `interval` (5m, also the local metrics interval). Token in `secrets/monitoring.env` |
 | `services.telegram` | `enabled`, `chat_id`, `interval` (60m), `on_boot` (true): screenshot to a Telegram chat; bot token `TELEGRAM_BOT_TOKEN` in `secrets/telegram.env` |
 | `services.scheduler` | `enabled`, `off_action`: `screen` (DPMS off, default), `apps` (stop all app units), `shutdown` (poweroff, wake via rtcwake at the next on time) |
+| `services.health` | `enabled`, `interval` (2m), `checks` (window, title, http, screen), `min_stddev` (3): restart an app that shows nothing. See `docs/health.md` |
+| `services.updates` | `enabled`, `security_only` (true), `reboot` (`HH:MM` or empty): unattended Ubuntu updates via unattended-upgrades, Chrome excluded; refused while the root is overlaid |
 | `schedule` | map of day → `{on: "HH:MM", off: "HH:MM"}`; days `mon`…`sun`, ranges `mon-fri`, or `daily`. After boot the current state is applied |
 | `security.disable_usb_storage` | blacklist usb-storage; refused while `usb_action` is enabled |
 | `persistence.mode` | `rw`, `locked`, `data`, `data+journal`; activated with `sudo kioskctl mount <mode>` + reboot |

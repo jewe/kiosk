@@ -92,6 +92,15 @@ services:
     interval: 5m
   scheduler:
     enabled: false
+  health:
+    enabled: false           # restart an app whose window is missing, blank or not served; see docs/health.md
+    interval: 2m
+    checks: [window, title, http]   # optional: screen (flat-colour detection, needs imagemagick)
+    min_stddev: 3
+  updates:
+    enabled: false           # unattended Ubuntu updates (needs rw mode); Chrome stays pinned
+    security_only: true
+    reboot: ""               # "03:30" = reboot at that time when a package asks for it; "" = never
 
 schedule: {}
   # mon-fri: { on: "07:30", off: "19:00" }
