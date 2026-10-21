@@ -63,6 +63,13 @@ autoinstall:
         echo "=================================================================="
       } | tee /dev/tty1 /dev/console
       exit 1
+  # first boot (cloud-init): no SSH host keys on the console, instead one line with host name and IP
+  user-data:
+    ssh:
+      emit_keys_to_console: false
+    no_ssh_fingerprints: true
+    runcmd:
+      - [sh, -c, 'printf "\n==================================================\n kiosk %s installed.  ssh __USERNAME__@%s\n IPs: %s\n==================================================\n\n" "$(hostname)" "$(hostname -I | cut -d" " -f1)" "$(hostname -I)" | tee /dev/console /dev/tty1']
   late-commands:
     - curtin in-target --target=/target -- bash -c 'git clone __REPO_URL__ /opt/kiosksystem || echo "clone of __REPO_URL__ failed during install; run bootstrap.sh" > /root/KIOSK-CLONE-FAILED'
     - curtin in-target --target=/target -- bash -c 'echo "__USERNAME__ ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/90-kioskadmin && chmod 440 /etc/sudoers.d/90-kioskadmin'
