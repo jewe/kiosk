@@ -26,7 +26,7 @@ Configuration
   update                     git pull system repo, re-run setup, re-apply
 
 Persistence
-  storage status|init [SIZE] persistent volume for /opt/kiosk (default 20G)
+  storage status|init [SIZE]|grow [SIZE|max]   persistent volume for /opt/kiosk (init default 20G)
   mount <rw|locked|data|data+journal>   set persistence mode (reboot required)
 
 On site
@@ -110,7 +110,9 @@ H
 ;;      storage) cat <<'H'
 kioskctl storage status           is /opt/kiosk a separate volume, size and usage
 sudo kioskctl storage init [SIZE] create the LVM volume for /opt/kiosk (default 20G), move the data, add to fstab
-  Needed for data and data+journal mode. Done by the autoinstall on new devices.
+sudo kioskctl storage grow [SIZE|max]   enlarge it online by SIZE (e.g. 40G) or to all free space (default max)
+  Needed for data and data+journal mode. The autoinstall creates an 8G volume and leaves the rest of the disk
+  free in the volume group; grow it when apps carry large content (kioskctl status shows the free space).
 H
 ;;      mount) cat <<'H'
 sudo kioskctl mount <mode>; reboot
@@ -548,6 +550,15 @@ cmd_storage() {
             systemctl daemon-reload
             mount "$KIOSK_DIR"
             log "done: $KIOSK_DIR is now on /dev/$vg/kiosk-data (the old copy stays hidden under the mount)" ;;
+        grow)
+            # grow <SIZE|max>: enlarge the data volume online (ext4 grows while mounted), e.g. grow 40G or grow max
+            require_root
+            local dev want="${2:-max}"
+            dev="$(findmnt -n -o SOURCE "$KIOSK_DIR" 2>/dev/null)"; [ -n "$dev" ] || die "$KIOSK_DIR is not a separate volume (kioskctl storage init)"
+            lvs --noheadings "$dev" >/dev/null 2>&1 || die "$dev is not an LVM volume"
+            if [ "$want" = max ]; then lvextend -r -l +100%FREE "$dev" 2>&1 | grep -i "successfully\|free\|matches" | tail -1
+            else [[ "$want" =~ ^[0-9]+[GgMm]$ ]] || die "size must be like 40G or max"; lvextend -r -L "+$want" "$dev" 2>&1 | tail -1; fi
+            log "$KIOSK_DIR: $(df -h --output=size,avail "$KIOSK_DIR" | tail -1 | awk '{print $1" total, "$2" free"}')" ;;
         *) usage; exit 1 ;;
     esac
 }
