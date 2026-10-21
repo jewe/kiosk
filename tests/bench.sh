@@ -25,7 +25,7 @@ quiet_start() {
     fi
 }
 quiet_end() { [ "$apps_were_active" = 1 ] && systemctl start kiosk.target 2>/dev/null || true; }
-trap 'quiet_end' EXIT
+trap 'rm -f "$BENCH_POLICY"; quiet_end' EXIT
 
 clocks() {   # one JSON object with governor, EPP, GPU clock, CPU temperature
     local gov epp gpu gmax temp
@@ -38,17 +38,21 @@ clocks() {   # one JSON object with governor, EPP, GPU clock, CPU temperature
         '{governor:$gov, epp:$epp, gpu_mhz:($gpu|tonumber? // null), gpu_max_mhz:($gmax|tonumber? // null), cpu_temp:($temp|tonumber? // null)}'
 }
 
-# chrome_start <url> [extra flags...]   Chrome with the production flags + DevTools port, as the kiosk user
+# chrome_start <url> [extra flags...]   Chrome with the production flags + DevTools port, as the kiosk user.
+# The kiosk policy disallows developer tools (DeveloperToolsAvailability=2), which also silences page-level
+# DevTools commands; a temporary policy file allows them for the benchmark only.
+BENCH_POLICY=/etc/opt/chrome/policies/managed/zz-bench.json
 chrome_start() {
     local url="$1"; shift
     local profile=/run/kiosk/bench
     rm -rf "$profile"; mkdir -p "$profile"; chown "$KIOSK_USER:$KIOSK_USER" "$profile"
+    mkdir -p "$(dirname "$BENCH_POLICY")"; echo '{"DeveloperToolsAvailability": 1}' > "$BENCH_POLICY"
     CHROME_EXTRA_FLAGS="${CHROME_EXTRA_FLAGS:-} $*" chrome_flags bench "$profile"
     xk setsid google-chrome-stable "${CHROME_ARGS[@]}" --remote-debugging-port=$PORT --remote-allow-origins='*' \
         --window-position=0,0 --kiosk "$url" >/dev/null 2>&1 < /dev/null &
     CHROME_PID=$!
 }
-chrome_stop() { pkill -f "user-data-dir=/run/kiosk/bench" 2>/dev/null || true; sleep 1; rm -rf /run/kiosk/bench; }
+chrome_stop() { pkill -f "user-data-dir=/run/kiosk/bench" 2>/dev/null || true; sleep 1; rm -rf /run/kiosk/bench "$BENCH_POLICY"; }
 
 # chrome_gpu_status: the feature list of chrome://gpu (hardware accelerated or not)
 chrome_gpu_status() {
