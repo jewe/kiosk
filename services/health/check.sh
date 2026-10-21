@@ -33,7 +33,7 @@ for ((i=0; i<count; i++)); do
     started="$(systemctl show -p ActiveEnterTimestampMonotonic --value "$unit")"
     now="$(( $(cut -d. -f1 /proc/uptime) * 1000000 ))"
     [ $(( now - started )) -gt 45000000 ] || continue           # younger than 45 s: still starting
-    reason=""
+    reason=""; title=""; code=""; sd=""
     wid="$(xk xdotool search --onlyvisible --class "kiosk-${n}" 2>/dev/null | head -1)"
     if has window && [ -z "$wid" ]; then reason="no window"; fi
     if [ -z "$reason" ] && has title && [ -n "$wid" ]; then
@@ -47,13 +47,14 @@ for ((i=0; i<count; i++)); do
     fi
     if [ -z "$reason" ] && has screen && [ -n "$wid" ]; then
         read -r x y w h < <(xk xdotool getwindowgeometry --shell "$wid" 2>/dev/null | awk -F= '/^X=|^Y=|^WIDTH=|^HEIGHT=/ {printf "%s ", $2}') || true
-        shot="$(mktemp --suffix=.png)"
+        shot="$(mktemp --suffix=.png)"; chown "$KIOSK_USER" "$shot"     # scrot runs as the kiosk user
         if xk scrot -o -a "${x:-0},${y:-0},${w:-100},${h:-100}" "$shot" 2>/dev/null; then
             sd="$(convert "$shot" -colorspace Gray -format '%[fx:standard_deviation*255]' info: 2>/dev/null | cut -d. -f1)"
             [ -n "$sd" ] && [ "${sd:-0}" -lt "$min_sd" ] && reason="flat screen (stddev $sd < $min_sd)"
         fi
         rm -f "$shot"
     fi
+    [ "$dry" = 1 ] && log "$n: window=${wid:-none} title='${title}' http=${code:-skipped} stddev=${sd:-skipped}"
     [ -n "$reason" ] || continue
     # restart, or escalate to the session after 3 restarts within 30 minutes
     nowts="$(date +%s)"; recent="$( { [ -f "$hist" ] && awk -v t="$nowts" -v a="$n" '$1 > t-1800 && $2 == a' "$hist"; } | wc -l)"
