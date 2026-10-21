@@ -22,7 +22,7 @@ Configuration
   app list|start|stop|restart|logs|update [name] [repo]
   display                    re-apply screen layout and touch mapping now
   extension list|update [id]|id <name>   Chrome extensions (config chrome.extensions)
-  secrets git-key [label]|tunnel-key|list   deploy keys and the tunnel key
+  secrets git-key [label] [--rsa]|tunnel-key|list   deploy keys (ed25519, --rsa for old git servers) and the tunnel key
   update                     git pull system repo, re-run setup, re-apply
 
 Persistence
@@ -94,8 +94,10 @@ kioskctl extension id <name>       ID of a private extension (derived from its k
   id: for a Web Store extension) and run sudo kioskctl apply. Details: docs/extensions.md
 H
 ;;      secrets) cat <<'H'
-sudo kioskctl secrets git-key [label]   create or show a deploy key (secrets/git/<label> or id_ed25519); add it
-                                        read-only on GitHub. One deploy key per repo: use <app>-app and <app>-data
+sudo kioskctl secrets git-key [label] [--rsa]   create or show a deploy key (secrets/git/<label> or id_ed25519); add it
+                                        read-only on the git server. GitHub: one deploy key per repo, so use <app>-app
+                                        and <app>-<data name>; GitLab accepts one key on many projects. --rsa makes a
+                                        4096-bit RSA key for old servers that reject ed25519 (ssh-rsa is enabled for it)
 sudo kioskctl secrets tunnel-key        show the public key of the SSH tunnel
 sudo kioskctl secrets list              list every public key
   Secrets live in /opt/kiosk/secrets (root, 0600). Copy them to or from your machine with tools/secrets.sh.
@@ -692,8 +694,11 @@ case "${1:-}" in
                       # git-key [label]: GitHub accepts a deploy key on one repo only, so use one key per repo,
                       # labelled <app>-app and <app>-data; without label the shared fallback key id_ed25519.
                       d="${KIOSK_SECRETS}/git"; install -d -m 0700 "$d"; touch "$d/known_hosts"
+                      # --rsa: 4096-bit RSA for old GitLab/Gitea servers that do not accept ed25519 keys
+                      local ktype=ed25519 kargs=(); [ "${3:-}" = "--rsa" ] && { shift; ktype=rsa; kargs=(-b 4096); }
+                      [ "${4:-}" = "--rsa" ] && { ktype=rsa; kargs=(-b 4096); }
                       k="${3:-id_ed25519}"; [[ "$k" =~ ^[a-z0-9_-]+$ ]] || die "label must be [a-z0-9_-]"
-                      [ -f "$d/$k" ] || { ssh-keygen -q -t ed25519 -N "" -C "kiosk-$(hostname)-$k" -f "$d/$k"; log "git deploy key '$k' generated"; }
+                      [ -f "$d/$k" ] || { ssh-keygen -q -t "$ktype" "${kargs[@]}" -N "" -C "kiosk-$(hostname)-$k" -f "$d/$k"; log "git deploy key '$k' generated ($ktype)"; }
                       echo "Add this as a read-only deploy key to the repo:"; cat "$d/$k.pub" ;;
                   list) ls -1 "${KIOSK_SECRETS}/git/"*.pub "${KIOSK_SECRETS}/tunnel/"*.pub 2>/dev/null || echo "no keys" ;;
                   tunnel-key) cat "${KIOSK_SECRETS}/tunnel/id_ed25519.pub" 2>/dev/null || die "no tunnel key yet (enable services.tunnel and apply)" ;;
