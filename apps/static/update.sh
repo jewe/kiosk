@@ -62,7 +62,11 @@ sync_repo() {
         if g clone -q --depth 1 --branch "$branch" "$url" "$dir" 2>/dev/null; then r="cloned $(g -C "$dir" rev-parse --short HEAD)"; else rm -rf "$dir"; echo failed; return; fi
     fi
     if [ "$lfs" = true ]; then
-        [ "$r" = unchanged ] && [ -z "$(g -C "$dir" lfs ls-files 2>/dev/null | grep '^[0-9a-f]* -' )" ] || lfs_sync "$dir" || r=failed
+        command -v git-lfs >/dev/null || apt_install git-lfs >&2 || true
+        # pull when the commit changed or any tracked file is still a pointer ("oid - path" in lfs ls-files)
+        if [ "$r" != unchanged ] || ! command -v git-lfs >/dev/null || g -C "$dir" lfs ls-files 2>/dev/null | grep -q '^[0-9a-f]* - '; then
+            lfs_sync "$dir" || r=failed
+        fi
     elif [ -f "$dir/.gitattributes" ] && grep -q 'filter=lfs' "$dir/.gitattributes"; then
         warn "$name: $(basename "$dir") uses Git LFS but lfs is not set: large files are pointer stubs"
     fi
