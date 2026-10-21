@@ -31,6 +31,7 @@ chmod u+w "$work/grub.cfg"
 sed -i.bak -E 's/^([[:space:]]*linux[[:space:]]+[^[:space:]]+)(.*)$/\1 autoinstall\2/; s/^set timeout=.*/set timeout=1/' "$work/grub.cfg"
 grep -q 'autoinstall' "$work/grub.cfg" || { echo "could not patch grub.cfg" >&2; exit 1; }
 
+rm -f "$out/$hostname.iso"               # xorriso does not overwrite an existing output image
 xorriso -indev "$iso" -outdev "$out/$hostname.iso" \
     -boot_image any replay \
     -map "$work/grub.cfg" /boot/grub/grub.cfg \
