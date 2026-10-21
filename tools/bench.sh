@@ -25,14 +25,14 @@ case "${1:-}" in
             echo
             echo "Collected with \`tools/bench.sh pull\`, measured with \`kioskctl bench\`. Levers: Chrome flags, TearFree, GPU clock floor, low latency (see docs/performance.md)."
             echo
-            echo "| Host | GPU | CPU | RAM | Chrome | Xorg | Test | Label | Flags | Score | Levers | Date |"
-            echo "|---|---|---|---|---|---|---|---|---|---|---|---|"
+            echo "| Host | GPU | CPU | RAM | Chrome | Xorg | Res | Test | Label | Flags | Score | Levers | Date |"
+            echo "|---|---|---|---|---|---|---|---|---|---|---|---|---|"
             cat "$dir"/*/*.json | jq -r -s '
                 def lev: .machine.levers // {} | [(.chrome_flags // [] | join(" ")), (if .tearfree == false then "no-tearfree" else empty end), (if .gpu_min_freq != "auto" and .gpu_min_freq != null then "gpu>=\(.gpu_min_freq)" else empty end), (if .low_latency == true then "low-latency" else empty end)] | map(select(length > 0)) | join(" ");
                 sort_by([.machine.gpu // "", .machine.host // "", .test, .ts]) | .[] |
-                "| \(.machine.host // "?") | \(.machine.gpu // "?" | gsub("Intel Corporation |Advanced Micro Devices, Inc. |NVIDIA Corporation |\\[AMD/ATI\\] "; "") | .[0:44]) | \(.machine.cpu // "?" | gsub("\\(R\\)|\\(TM\\)| CPU.*"; "") | .[0:32]) | \((.machine.ram_mb // 0) / 1024 | round) GB | \(.machine.chrome // "-" | split(".")[0]) | \(.machine.xorg_driver // "-") | \(.test) | \(.label // "-") | \(.extra_flags // "" | if . == "" then "-" else . end) | **\(.score // "-" | if type == "number" then (. * 10 | round / 10) else . end)** | \(lev | if . == "" then "-" else . end) | \(.ts | if test("^[0-9]{8}-") then "\(.[0:4])-\(.[4:6])-\(.[6:8]) \(.[9:11]):\(.[11:13])" else .[0:16] end) |"'
+                "| \(.machine.host // "?") | \(.machine.gpu // "?" | gsub("Intel Corporation |Advanced Micro Devices, Inc. |NVIDIA Corporation |\\[AMD/ATI\\] "; "") | .[0:44]) | \(.machine.cpu // "?" | gsub("\\(R\\)|\\(TM\\)| CPU.*"; "") | .[0:32]) | \((.machine.ram_mb // 0) / 1024 | round) GB | \(.machine.chrome // "-" | split(".")[0]) | \(.machine.xorg_driver // "-") | \(.machine.bench_res // (.machine.screen // "?" | split("+")[0]) + " (screen)")\(if .machine.clipped then " clipped" else "" end) | \(.test) | \(.label // "-") | \(.extra_flags // "" | if . == "" then "-" else . end) | **\(.score // "-" | if type == "number" then (. * 10 | round / 10) else . end)** | \(lev | if . == "" then "-" else . end) | \(.ts | if test("^[0-9]{8}-") then "\(.[0:4])-\(.[4:6])-\(.[6:8]) \(.[9:11]):\(.[11:13])" else .[0:16] end) |"'
             echo
-            echo "Rows sorted by GPU, host, test, date. A/B runs share a date and differ in Flags."
+            echo "Rows sorted by GPU, host, test, date. A/B runs share a date and differ in Flags. Res = pixels drawn by the benchmark (1920x1080 since 0.2.60; older rows ran fullscreen at the screen size, marked (screen))."
         } > "$dir/README.md"
         echo "wrote $dir/README.md ($(grep -c '^| ' "$dir/README.md") lines)" ;;
     *) sed -n '2,5p' "$0"; exit 1 ;;

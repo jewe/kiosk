@@ -3,6 +3,7 @@
 #   bench.sh info                  GPU, driver, video decode, Chrome's own GPU feature status
 #   bench.sh gpu                   glmark2 (fullscreen, about 8 minutes)
 #   bench.sh motionmark [--online] MotionMark with the production Chrome flags, score read via DevTools (about 6 minutes)
+# Every run draws 1920x1080 (BENCH_RES) so kiosks with different screens are comparable.
 #   bench.sh ab "<flags A>" "<flags B>" [rounds]   MotionMark alternating with two extra flag sets (default 2 rounds each)
 # The kiosk apps are stopped during gpu/motionmark and started again afterwards.
 [ -n "${BASH_VERSION:-}" ] || exec bash "$0" "$@"
@@ -15,6 +16,9 @@ export DISPLAY=:0 XAUTHORITY="/home/${KIOSK_USER}/.Xauthority"
 out="${KIOSK_DIR}/data/bench"; mkdir -p "$out"; ts="$(date +%Y%m%d-%H%M%S)"
 CDP="${KIOSK_SYS}/tests/cdp.py"; PORT=9222
 MM_DIR="${KIOSK_DIR}/data/bench/MotionMark"; MM_PORT=8765
+# all runs draw 1920x1080 regardless of the screen (MotionMark sizes its stage from the window, glmark2 is
+# fill-rate bound), so scores of different kiosks are comparable. Smaller screens clip and are flagged.
+BENCH_RES="${BENCH_RES:-1920x1080}"
 xk() { if [ "$(id -u)" -eq 0 ]; then sudo -u "$KIOSK_USER" env DISPLAY=:0 XAUTHORITY="$XAUTHORITY" "$@"; else "$@"; fi; }
 [ "$(id -u)" -eq 0 ] || [ "$(id -un)" = "$KIOSK_USER" ] || die "run as root: sudo kioskctl bench $what"
 
@@ -50,8 +54,9 @@ machine() {
     jq -c -n --arg host "$(hostname)" --arg cpu "$cpu" --arg gpu "$gpu" --argjson ram "${ram:-0}" --arg kernel "$(uname -r)" \
         --arg os "$(. /etc/os-release 2>/dev/null; echo "${PRETTY_NAME:-}")" --arg xdrv "$xdrv" --arg chrome "$chrome" \
         --arg system "$(cat "$KIOSK_SYS/VERSION" 2>/dev/null)" --argjson levers "$levers" \
-        --arg screen "$(xk xrandr --query 2>/dev/null | awk '/ connected/ && /primary/ {print $4; exit}')" \
-        '{host:$host, cpu:$cpu, gpu:$gpu, ram_mb:$ram, os:$os, kernel:$kernel, xorg_driver:$xdrv, chrome:$chrome, system:$system, screen:$screen, levers:$levers}'
+        --arg screen "$(xk xrandr --query 2>/dev/null | awk '/ connected/ && /primary/ {print $4; exit}')" --arg res "$BENCH_RES" \
+        '{host:$host, cpu:$cpu, gpu:$gpu, ram_mb:$ram, os:$os, kernel:$kernel, xorg_driver:$xdrv, chrome:$chrome, system:$system, screen:$screen, bench_res:$res,
+          clipped:(($screen | capture("(?<w>[0-9]+)x(?<h>[0-9]+)")? // {w:"0",h:"0"}) as $s | ($res | capture("(?<w>[0-9]+)x(?<h>[0-9]+)")) as $r | (($s.w|tonumber) < ($r.w|tonumber)) or (($s.h|tonumber) < ($r.h|tonumber))), levers:$levers}'
 }
 
 # chrome_start <url> [extra flags...]   Chrome with the production flags + DevTools port, as the kiosk user.
@@ -65,7 +70,7 @@ chrome_start() {
     mkdir -p "$(dirname "$BENCH_POLICY")"; echo '{"DeveloperToolsAvailability": 1}' > "$BENCH_POLICY"
     CHROME_EXTRA_FLAGS="${CHROME_EXTRA_FLAGS:-} $*" chrome_flags bench "$profile"
     xk setsid google-chrome-stable "${CHROME_ARGS[@]}" --remote-debugging-port=$PORT --remote-allow-origins='*' \
-        --window-position=0,0 --kiosk "$url" >/dev/null 2>&1 < /dev/null &
+        --window-position=0,0 --window-size="${BENCH_RES%x*},${BENCH_RES#*x}" --app="$url" >/dev/null 2>&1 < /dev/null &
     CHROME_PID=$!
 }
 chrome_stop() { pkill -f "user-data-dir=/run/kiosk/bench" 2>/dev/null || true; sleep 1; rm -rf /run/kiosk/bench "$BENCH_POLICY"; }
@@ -133,7 +138,7 @@ case "$what" in
         command -v glmark2 >/dev/null || apt_install glmark2
         quiet_start
         log "glmark2 running (about 8 minutes, fullscreen)"
-        xk stdbuf -oL glmark2 --fullscreen --annotate 2>&1 | tee "$out/glmark2-$ts.txt" | grep -i 'glmark2 Score\|GL_RENDERER\|error'
+        xk stdbuf -oL glmark2 -s "$BENCH_RES" --annotate 2>&1 | tee "$out/glmark2-$ts.txt" | grep -i 'glmark2 Score\|GL_RENDERER\|error'
         score="$(grep -o 'glmark2 Score: [0-9]*' "$out/glmark2-$ts.txt" | awk '{print $3}')"
         jq -n --argjson score "${score:-null}" --arg ts "$ts" --argjson machine "$(machine)" --argjson clocks "$(clocks)" \
             '{test:"glmark2", label:"default", score:$score, ts:$ts, machine:$machine, after:$clocks}' > "$out/glmark2-$ts.json"
