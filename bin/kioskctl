@@ -292,6 +292,11 @@ cmd_status() {
 status_static_json() {
     local os_name kernel apt_upgradable reboot_required system_behind system_fetched ver mode ov screens
     os_state; ver="$(cmd_version)"; mode="$(persistence_mode)"; ov="$(overlayroot_active && echo yes || echo no)"
+    local bench='{}'
+    if ls "${KIOSK_DIR}"/data/bench/*.json >/dev/null 2>&1; then
+        bench="$(cat "${KIOSK_DIR}"/data/bench/*.json 2>/dev/null | jq -sc '[.[] | select(.score != null)] | group_by(.test) | map({key: .[0].test, value: (max_by(.ts) | {score, label, ts})}) | from_entries' 2>/dev/null)"
+        jq -e . <<<"$bench" >/dev/null 2>&1 || bench='{}'
+    fi
     screens="[]"
     if x_running; then
         screens="$(env "${XENV[@]}" xrandr --query 2>/dev/null | awk '/ connected/ {geo=($3=="primary")?$4:$3; printf "%s%s|%s|%s\n", "", $1, geo, ($3=="primary")?"yes":"no"}' \
@@ -304,7 +309,7 @@ status_static_json() {
         --argjson apps "$(yq -c '[.apps[]? | {name, type, screen:(.screen // "primary"), geometry:(.geometry // "fullscreen")}]' "$KIOSK_CONFIG" 2>/dev/null || echo '[]')" \
         --argjson extensions "$(yq -c '(.chrome.extensions // []) | length' "$KIOSK_CONFIG" 2>/dev/null || echo 0)" \
         --argjson screens "$screens" \
-        --argjson bench "$(cat "${KIOSK_DIR}"/data/bench/*.json 2>/dev/null | jq -sc '[.[] | select(.score != null)] | group_by(.test) | map({key: .[0].test, value: (max_by(.ts) | {score, label, ts})}) | from_entries' 2>/dev/null || echo '{}')" \
+        --argjson bench "$bench" \
         '{device:$device, version:$version, os:$os, kernel:$kernel, apt_upgradable:$apt, reboot_required:$reboot, system_behind:$behind,
           persistence:$mode, overlay_active:$ov, data_volume:$volfs, services:$services, apps:$apps, extensions:$extensions, screens:$screens, bench:$bench, ts:(now|todate)}'
 }
