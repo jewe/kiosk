@@ -32,6 +32,7 @@ use_key() {  # use_key <label>: GitHub allows a deploy key on one repository onl
 }
 # runs as root (content dirs are root-owned, world-readable for nginx); LFS smudge off, objects pulled explicitly
 g() { GIT_LFS_SKIP_SMUDGE=1 timeout 600 git -c safe.directory='*' "$@"; }
+gslow() { GIT_LFS_SKIP_SMUDGE=1 timeout 3600 git -c safe.directory='*' "$@"; }   # clone and fetch of large repos
 
 # drop objects of previous commits once the object store is worth it
 gc_repo() {
@@ -76,13 +77,13 @@ sync_repo_once() {
     if [ -d "$dir/.git" ]; then
         [ "$(g -C "$dir" remote get-url origin 2>/dev/null)" = "$url" ] || g -C "$dir" remote set-url origin "$url"
         before="$(g -C "$dir" rev-parse HEAD 2>/dev/null)"
-        g -C "$dir" fetch -q --depth 1 origin "$branch" 2>/dev/null || { echo failed; return; }
+        gslow -C "$dir" fetch -q --depth 1 origin "$branch" 2>/dev/null || { echo failed; return; }
         g -C "$dir" reset -q --hard FETCH_HEAD 2>/dev/null || { echo failed; return; }
         after="$(g -C "$dir" rev-parse HEAD 2>/dev/null)"
         if [ "$before" = "$after" ]; then r=unchanged; else r="changed ${before:0:7}->${after:0:7}"; gc_repo "$dir"; fi
     else
         mkdir -p "$(dirname "$dir")"
-        if g clone -q --depth 1 --branch "$branch" "$url" "$dir" 2>/dev/null; then r="cloned $(g -C "$dir" rev-parse --short HEAD)"; else rm -rf "$dir"; echo failed; return; fi
+        if gslow clone -q --depth 1 --branch "$branch" "$url" "$dir" 2>/dev/null; then r="cloned $(g -C "$dir" rev-parse --short HEAD)"; else rm -rf "$dir"; echo failed; return; fi
     fi
     if [ "$lfs" = true ]; then
         command -v git-lfs >/dev/null || apt_install git-lfs >&2 || true
