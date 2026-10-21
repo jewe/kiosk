@@ -5,6 +5,8 @@ After=network-online.target
 
 [Service]
 Type=oneshot
+# network-online.target fires before DHCP has finished on some boots: wait up to 60 s for a default route
+ExecStartPre=/bin/sh -c 'for i in $(seq 1 30); do ip route show default 2>/dev/null | grep -q . && exit 0; sleep 2; done; exit 0'
 ExecStart=/opt/kiosksystem/apps/static/update.sh %i
 TimeoutStartSec=180
 

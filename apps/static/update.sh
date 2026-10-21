@@ -47,8 +47,14 @@ lfs_sync() {
     timeout 600 git -C "$dir" -c safe.directory='*' lfs prune -f >/dev/null 2>&1 || true
 }
 
-# sync_repo <url> <branch> <dir> <lfs>  → echoes cloned|changed|unchanged|failed
+# sync_repo <url> <branch> <dir> <lfs>  → echoes cloned|changed|unchanged|failed; one retry after 15 s (boot, flaky link)
 sync_repo() {
+    local r
+    r="$(sync_repo_once "$@")"
+    if [ "$r" = failed ]; then sleep 15; r="$(sync_repo_once "$@")"; fi
+    echo "$r"
+}
+sync_repo_once() {
     local url="$1" branch="${2:-main}" dir="$3" lfs="${4:-false}" before after r
     if [ -d "$dir/.git" ]; then
         [ "$(g -C "$dir" remote get-url origin 2>/dev/null)" = "$url" ] || g -C "$dir" remote set-url origin "$url"
