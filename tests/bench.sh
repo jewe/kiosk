@@ -63,8 +63,8 @@ chrome_gpu_status() {
 motionmark_url() {   # offline copy if present, else browserbench.org
     if [ "${1:-}" != "--online" ]; then
         if [ ! -f "$MM_DIR/MotionMark/index.html" ]; then
-            log "cloning MotionMark into $MM_DIR (once, about 30 MB)"
-            git clone -q --depth 1 https://github.com/WebKit/MotionMark "$MM_DIR" 2>/dev/null || warn "clone failed (offline?), using browserbench.org"
+            log "cloning MotionMark into $MM_DIR (once, about 30 MB)" >&2
+            git clone -q --depth 1 https://github.com/WebKit/MotionMark "$MM_DIR" 2>/dev/null || warn "clone failed (offline?), using browserbench.org" >&2
         fi
         if [ -f "$MM_DIR/MotionMark/index.html" ]; then
             fuser -k ${MM_PORT}/tcp >/dev/null 2>&1 || true
