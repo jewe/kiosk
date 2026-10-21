@@ -32,7 +32,7 @@ case "${1:-}" in
                 sort_by([.machine.gpu // "", .machine.host // "", .test, .ts]) | .[] |
                 "| \(.machine.host // "?") | \(.machine.gpu // "?" | gsub("Intel Corporation |Advanced Micro Devices, Inc. |NVIDIA Corporation |\\[AMD/ATI\\] "; "") | .[0:44]) | \(.machine.cpu // "?" | gsub("\\(R\\)|\\(TM\\)| CPU.*"; "") | .[0:32]) | \((.machine.ram_mb // 0) / 1024 | round) GB | \(.machine.chrome // "-" | split(".")[0]) | \(.machine.xorg_driver // "-") | \(.machine.bench_res // (.machine.screen // "?" | split("+")[0]) + " (screen)")\(if .machine.clipped then " clipped" else "" end) | \(.test) | \(.label // "-") | \(.extra_flags // "" | if . == "" then "-" else . end) | **\(.score // "-" | if type == "number" then (. * 10 | round / 10) else . end)** | \(lev | if . == "" then "-" else . end) | \(.ts | if test("^[0-9]{8}-") then "\(.[0:4])-\(.[4:6])-\(.[6:8]) \(.[9:11]):\(.[11:13])" else .[0:16] end) |"'
             echo
-            echo "Rows sorted by GPU, host, test, date. A/B runs share a date and differ in Flags. Res = pixels drawn by the benchmark (1920x1080 since 0.2.60; older rows ran fullscreen at the screen size, marked (screen))."
+            echo "Rows sorted by GPU, host, test, date. A/B runs share a date and differ in Flags. Res = pixels drawn by the benchmark (1920x1080 since 0.2.55; older rows ran fullscreen at the screen size, marked (screen))."
         } > "$dir/README.md"
         echo "wrote $dir/README.md ($(grep -c '^| ' "$dir/README.md") lines)" ;;
     *) sed -n '2,5p' "$0"; exit 1 ;;
