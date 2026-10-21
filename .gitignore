@@ -4,5 +4,5 @@ autoinstall/out/
 .DS_Store
 secrets/*
 !secrets/README.md
-docs/*
+docs/
 config/kiosk.yaml
