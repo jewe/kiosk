@@ -21,6 +21,7 @@ Configuration
   apply                      check kiosk.yaml and apply apps, display, services, extensions
   app list|start|stop|restart|logs|update [name] [repo]
   display                    re-apply screen layout and touch mapping now
+  x <command...>             run an X program in the kiosk session, e.g. kioskctl x xrandr --query
   extension list|update [id]|id <name>   Chrome extensions (config chrome.extensions)
   secrets git-key [label] [--rsa]|tunnel-key|list   deploy keys (ed25519, --rsa for old git servers) and the tunnel key
   update                     git pull system repo, re-run setup, re-apply
@@ -746,6 +747,8 @@ case "${1:-}" in
                   *) usage; exit 1 ;;
               esac ;;
     wifi)     cmd_wifi "${@:2}" ;;
+    x)        require_root; [ $# -ge 2 ] || die "usage: kioskctl x <command...>  (xrandr --query, xinput list, xdotool ...)"
+              x_running || die "X is not running"; as_kiosk_x "${@:2}" ;;
     extension|ext) "${KIOSK_SYS}/apps/web/extensions.sh" "${@:2}" ;;
     update)   cmd_update ;;
     version)  cmd_version ;;
