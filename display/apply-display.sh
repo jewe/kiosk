@@ -19,7 +19,8 @@ if [ "$n" = "0" ]; then
     rot="$(cfg '.display.rotate' normal)"
     prim="$(xrandr --query | awk '/ connected primary/ {print $1; exit}')"
     if [ -n "$prim" ]; then
-        cur="$(xrandr --query | awk -v o="$prim" '$1==o {for(i=1;i<=NF;i++) if($i=="left"||$i=="right"||$i=="inverted") {print $i; exit}; print "normal"}')"
+        # current rotation = the word right after the geometry (absent when normal); the list in () is what is supported
+        cur="$(xrandr --query | awk -v o="$prim" '$1==o {for(i=1;i<=NF;i++) if($i ~ /^[0-9]+x[0-9]+\+/) {if($(i+1)=="left"||$(i+1)=="right"||$(i+1)=="inverted") print $(i+1); else print "normal"; exit}}')"
         [ "$cur" = "$rot" ] || { xrandr --output "$prim" --rotate "$rot" && log "$prim rotated: $rot"; }
     fi
 else
