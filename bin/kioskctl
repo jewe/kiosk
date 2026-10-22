@@ -387,7 +387,11 @@ cmd_history() {
 cmd_check() {
     local f="${1:-$KIOSK_CONFIG}" out
     [ -f "$f" ] || die "no config at $f"
-    yq -e '.' "$f" >/dev/null 2>&1 || die "$f is not valid YAML"
+    if ! out="$(yq -e '.' "$f" 2>&1 >/dev/null)"; then
+        # yq is the Python wrapper: its parser message names line and column
+        echo "$out" | grep -v "^usage:\|^yq: error" | sed 's/^/  /'
+        die "$f is not valid YAML (see above; usual causes: a tab instead of spaces, a missing space after ':', unbalanced quotes)"
+    fi
     out="$(yq -c . "$f" | jq -r -f "${KIOSK_SYS}/lib/config-check.jq" 2>&1)" || { echo "$out"; die "validator failed"; }
     [ -n "$out" ] && echo "$out"
     if grep -q '^ERROR' <<<"$out"; then echo "config: $(grep -c '^ERROR' <<<"$out") error(s)"; return 1; fi
