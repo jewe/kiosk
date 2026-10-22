@@ -15,6 +15,13 @@ if [ "$n" = "0" ]; then
     if [ -n "$first" ] && ! xrandr --query | grep -q ' connected primary '; then
         xrandr --output "$first" --primary && log "primary output: $first"
     fi
+    # display.rotate: shortcut for a single rotated screen (normal|left|right|inverted) without an outputs list
+    rot="$(cfg '.display.rotate' normal)"
+    prim="$(xrandr --query | awk '/ connected primary/ {print $1; exit}')"
+    if [ -n "$prim" ]; then
+        cur="$(xrandr --query | awk -v o="$prim" '$1==o {for(i=1;i<=NF;i++) if($i=="left"||$i=="right"||$i=="inverted") {print $i; exit}; print "normal"}')"
+        [ "$cur" = "$rot" ] || { xrandr --output "$prim" --rotate "$rot" && log "$prim rotated: $rot"; }
+    fi
 else
     args=()
     for ((i=0; i<n; i++)); do

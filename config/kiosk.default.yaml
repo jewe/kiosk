@@ -8,6 +8,7 @@ device:
 display:
   tearfree: true             # Xorg TearFree (modesetting/amdgpu); false = a little more throughput, possible tearing
   background: /opt/kiosksystem/branding/backgrounds/black.jpg
+  rotate: normal             # whole screen: normal | left | right | inverted (for several screens use outputs[].rotate)
   outputs: []                # empty = xrandr --auto. Example:
   # - name: HDMI-1
   #   primary: true
