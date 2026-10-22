@@ -115,11 +115,11 @@ motionmark_run() {
     python3 "$CDP" $PORT eval 'benchmarkController.startBenchmark(); true' >/dev/null || { warn "could not start the benchmark"; chrome_stop; return 1; }
     score="$(python3 "$CDP" $PORT wait '(function(){var e=document.querySelector("#results .score");return e&&e.textContent.trim()?parseFloat(e.textContent):0})()' 900)" || { warn "no result after 15 minutes"; chrome_stop; return 1; }
     # per-test scores: names are in the #results-header table, numbers in #results-score, same row order
-    tests="$(python3 "$CDP" $PORT eval '(function(){var h=document.querySelector("#results-header"),s=document.querySelector("#results-score");if(!h||!s)return "";var n=Array.from(h.querySelectorAll("tr")).map(r=>r.textContent.trim()),v=Array.from(s.querySelectorAll("tr")).map(r=>r.textContent.trim());return n.map((x,i)=>x+"="+(v[i]||"")).filter(x=>!/^Score=|=$/.test(x)).join("\n")})()' 2>/dev/null | python3 -c 'import sys,json;print(json.load(sys.stdin) or "")')"
+    tests="$(python3 "$CDP" $PORT eval '(function(){var h=document.querySelector("#results-header"),s=document.querySelector("#results-score");if(!h||!s)return "";var n=Array.from(h.querySelectorAll("tr")).map(r=>r.textContent.trim()),v=Array.from(s.querySelectorAll("tr")).map(r=>r.textContent.trim());return n.map((x,i)=>x+"="+(v[i]||"")).filter(x=>!/^(Score|Test Name)=|=$/.test(x)).join("\n")})()' 2>/dev/null | python3 -c 'import sys,json;print(json.load(sys.stdin) or "")')"
     after="$(clocks)"
     chrome_stop
     jq -n --arg label "$label" --arg flags "$*" --argjson score "$score" --arg tests "$tests" --argjson before "$before" --argjson after "$after" --arg url "$url" --arg ts "$ts" --argjson machine "$(machine)" \
-        '{test:"motionmark",label:$label,score:$score,extra_flags:$flags,url:$url,ts:$ts,machine:$machine,before:$before,after:$after,tests:($tests|split("\n")|map(select(length>0 and contains("="))|split("=")|{key:.[0],value:(.[1]|tonumber? // .[1])})|from_entries)}' > "$f" \
+        '{test:"motionmark",label:$label,score:$score,extra_flags:$flags,url:$url,ts:$ts,machine:$machine,before:$before,after:$after,tests:($tests|split("\n")|map(select(length>0 and contains("="))|split("=")|{key:.[0],value:(.[1] as $v | ($v|tonumber?) // $v)})|from_entries)}' > "$f" \
         || { warn "could not write $f (score $score, tests: ${tests:0:200})"; rm -f "$f"; }
     logger -t kiosk-bench -- "$(jq -c '{test,label,score,extra_flags,file:"'"$f"'"}' "$f")"
     echo "$score"
