@@ -70,7 +70,7 @@ performance:
   low_latency: false         # true = shallow CPU C-states (kernel option, reboot); try if frame times are jittery
 
 network:
-  wifi: []                   # up to 3 names; credentials in /opt/kiosk/secrets/wifi.env
+  wifi: [service, office]    # up to 3 names; credentials in /opt/kiosk/secrets/wifi.env
 
 services:
   tunnel:

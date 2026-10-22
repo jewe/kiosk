@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 # Runs inside the X server started by kiosk-session.service (via startx).
 # Configures screens from kiosk.yaml, sets the background, then runs openbox.
+# The session inherits an ambient capability (CAP_WAKE_ALARM) from the service/PAM start. bubblewrap, which
+# GTK's icon loader runs for SVGs, refuses to start in a process with capabilities, so caja and other GTK apps
+# started from openbox abort. Drop every inheritable and ambient capability for the whole session tree.
+if [ -z "${KIOSK_CAPS_DROPPED:-}" ] && command -v setpriv >/dev/null; then
+    export KIOSK_CAPS_DROPPED=1
+    exec setpriv --inh-caps=-all --ambient-caps=-all "$0" "$@"
+fi
 source /opt/kiosksystem/lib/common.sh
 LOG_TAG="xsession"
 
