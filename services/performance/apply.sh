@@ -40,6 +40,18 @@ else
     [ -f "$grub_drop" ] && { run_on_real_root bash -c "rm -f $grub_drop && update-grub >/dev/null 2>&1" && log "low_latency off after the next reboot" || true; }
 fi
 
+# --- boot splash (display.splash): plymouth costs 1-3 s before X; false = plain black boot without it ---
+splash_drop=/etc/default/grub.d/92-kiosk-splash.cfg
+if [ "$(cfg '.display.splash' true)" = false ]; then
+    content='GRUB_CMDLINE_LINUX_DEFAULT="quiet loglevel=3 vt.global_cursor_default=0"'
+    [ -f "$splash_drop" ] && [ "$(cat "$splash_drop")" = "$content" ] || {
+        run_on_real_root bash -c "mkdir -p /etc/default/grub.d && printf '%s\n' '$content' > $splash_drop && update-grub >/dev/null 2>&1" \
+            && log "boot splash off after the next reboot" || warn "could not write the GRUB drop-in"
+    }
+else
+    [ -f "$splash_drop" ] && { run_on_real_root bash -c "rm -f $splash_drop && update-grub >/dev/null 2>&1" && log "boot splash on after the next reboot" || true; }
+fi
+
 # --- i915 module options (Intel): frame buffer compression on, panel self refresh off ---
 if has_gpu intel; then
     if write_file /etc/modprobe.d/kiosk-i915.conf <<'M'

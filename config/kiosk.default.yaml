@@ -9,6 +9,7 @@ display:
   tearfree: true             # Xorg TearFree (modesetting/amdgpu); false = a little more throughput, possible tearing
   background: /opt/kiosksystem/branding/backgrounds/black.jpg
   rotate: normal             # whole screen: normal | left | right | inverted (for several screens use outputs[].rotate)
+  splash: true               # plymouth boot splash with display.background; false boots 1-3 s faster to a black screen
   outputs: []                # empty = xrandr --auto. Example:
   # - name: HDMI-1
   #   primary: true
