@@ -7,7 +7,7 @@
   <desktops><number>1</number></desktops>
   <keyboard>
     <keybind key="C-A-t"><action name="Execute"><command>sh -c 'command -v mate-terminal >/dev/null &amp;&amp; exec mate-terminal; exec x-terminal-emulator'</command></action></keybind>
-    <keybind key="C-A-f"><action name="Execute"><command>caja</command></action></keybind>
+    <keybind key="C-A-f"><action name="Execute"><command>/opt/kiosksystem/display/open-files.sh</command></action></keybind>
     <keybind key="C-A-c"><action name="Execute"><command>code</command></action></keybind>
     <keybind key="A-Tab"><action name="NextWindow"><finalactions><action name="Focus"/><action name="Raise"/></finalactions></action></keybind>
     <keybind key="C-A-q"><action name="Close"/></keybind>

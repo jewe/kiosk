@@ -8,6 +8,7 @@ apt_install \
     yq jq curl wget ca-certificates gnupg \
     pciutils usbutils lm-sensors lvm2 \
     htop nano less scrot \
+    caja mate-terminal pluma eom udisks2 gvfs gvfs-backends gvfs-fuse mate-polkit \
     network-manager autossh \
     pipewire pipewire-pulse wireplumber alsa-utils
 

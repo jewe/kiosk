@@ -35,7 +35,7 @@ for item in $choice; do
                 echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/code stable main" > /etc/apt/sources.list.d/vscode.list
                 apt-get update; apt_install code
             fi; log "vscode installed" ;;
-        mate)   apt_install caja mate-terminal pluma udisks2 gvfs gvfs-backends gvfs-fuse mate-polkit eom; log "mate helpers installed (caja mounts USB sticks via udisks2)" ;;
+        mate)   apt_install caja mate-terminal pluma udisks2 gvfs gvfs-backends gvfs-fuse mate-polkit eom; log "mate helpers installed (part of the base setup since 0.2.63; caja mounts USB sticks via udisks2)" ;;
         htop)   apt_install htop nvtop iotop ncdu; log "monitoring tools installed" ;;
         glmark2) apt_install glmark2 ;;
         devmode) kioskctl devmode on ;;
