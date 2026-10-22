@@ -62,7 +62,8 @@ write_file() {
 cfg() {
     local expr="$1" default="${2:-}" val
     [ -f "$KIOSK_CONFIG" ] || { printf '%s' "$default"; return; }
-    val="$(yq -r "$expr // \"\"" "$KIOSK_CONFIG" 2>/dev/null || true)"
+    # not `//`: that would turn a YAML false into the default. Only null/missing falls back.
+    val="$(yq -r "($expr) | if . == null then \"\" else . end" "$KIOSK_CONFIG" 2>/dev/null || true)"
     if [ -z "$val" ] || [ "$val" = "null" ]; then
         printf '%s' "$default"
     else

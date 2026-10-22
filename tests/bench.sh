@@ -119,7 +119,8 @@ motionmark_run() {
     after="$(clocks)"
     chrome_stop
     jq -n --arg label "$label" --arg flags "$*" --argjson score "$score" --arg tests "$tests" --argjson before "$before" --argjson after "$after" --arg url "$url" --arg ts "$ts" --argjson machine "$(machine)" \
-        '{test:"motionmark",label:$label,score:$score,extra_flags:$flags,url:$url,ts:$ts,machine:$machine,before:$before,after:$after,tests:($tests|split("\n")|map(select(length>0 and contains("="))|split("=")|{key:.[0],value:(.[1]|tonumber? // .[1])})|from_entries)}' > "$f"
+        '{test:"motionmark",label:$label,score:$score,extra_flags:$flags,url:$url,ts:$ts,machine:$machine,before:$before,after:$after,tests:($tests|split("\n")|map(select(length>0 and contains("="))|split("=")|{key:.[0],value:(.[1]|tonumber? // .[1])})|from_entries)}' > "$f" \
+        || { warn "could not write $f (score $score, tests: ${tests:0:200})"; rm -f "$f"; }
     logger -t kiosk-bench -- "$(jq -c '{test,label,score,extra_flags,file:"'"$f"'"}' "$f")"
     echo "$score"
 }
