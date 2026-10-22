@@ -15,6 +15,10 @@ case "${1:-}" in
             n="$(ssh "$host" 'ls /opt/kiosk/data/bench/*.json 2>/dev/null | wc -l')"
             [ "$n" -gt 0 ] || { echo "$name: no results"; continue; }
             ssh "$host" 'tar -C /opt/kiosk/data/bench -czf - $(cd /opt/kiosk/data/bench && ls *.json)' | tar -C "$dir/$name" -xzf -
+            # results from before the machine block: at least the host name, so the row is attributable
+            for j in "$dir/$name"/*.json; do
+                jq -e '.machine' "$j" >/dev/null 2>&1 || { jq --arg h "$name" '.machine = {host: $h}' "$j" > "$j.tmp" && mv "$j.tmp" "$j"; }
+            done
             echo "$name: $(ls "$dir/$name"/*.json | wc -l) result files"
         done
         "$0" table ;;
