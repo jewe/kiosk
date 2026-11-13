@@ -31,7 +31,7 @@ quiet_start() {
     [ ${#stopped_units[@]} -gt 0 ] && systemctl stop "${stopped_units[@]}" 2>/dev/null || true
 }
 quiet_end() { [ ${#stopped_units[@]} -gt 0 ] && systemctl start "${stopped_units[@]}" 2>/dev/null || true; stopped_units=(); }
-trap 'rm -f "$BENCH_POLICY"; quiet_end' EXIT
+trap 'rm -f "$BENCH_POLICY"; urls_restore; quiet_end' EXIT
 
 clocks() {   # one JSON object with governor, EPP, GPU clock, CPU temperature
     local gov epp gpu gmax temp
@@ -65,17 +65,21 @@ machine() {
 # The kiosk policy disallows developer tools (DeveloperToolsAvailability=2), which also silences page-level
 # DevTools commands; a temporary policy file allows them for the benchmark only.
 BENCH_POLICY="$(browser_policy_dir)/zz-bench.json"
+# chrome.allowed_domains would block chrome://gpu and browserbench.org: the URL policy is set aside during a run
+URL_POLICY="$(browser_policy_dir)/kiosk-urls.json"
+urls_restore() { [ -f "$URL_POLICY.bench" ] && mv -f "$URL_POLICY.bench" "$URL_POLICY" || true; }
 chrome_start() {
     local url="$1"; shift
     local profile=/run/kiosk/bench
     rm -rf "$profile"; mkdir -p "$profile"; chown "$KIOSK_USER:$KIOSK_USER" "$profile"
     mkdir -p "$(dirname "$BENCH_POLICY")"; echo '{"DeveloperToolsAvailability": 1}' > "$BENCH_POLICY"
+    [ -f "$URL_POLICY" ] && mv -f "$URL_POLICY" "$URL_POLICY.bench"
     CHROME_EXTRA_FLAGS="${CHROME_EXTRA_FLAGS:-} $*" chrome_flags bench "$profile"
     xk setsid "$(browser_bin)" "${CHROME_ARGS[@]}" --remote-debugging-port=$PORT --remote-allow-origins='*' \
         --window-position=0,0 --window-size="${BENCH_RES%x*},${BENCH_RES#*x}" --app="$url" >/dev/null 2>&1 < /dev/null &
     CHROME_PID=$!
 }
-chrome_stop() { pkill -f "user-data-dir=/run/kiosk/bench" 2>/dev/null || true; sleep 1; rm -rf /run/kiosk/bench "$BENCH_POLICY"; }
+chrome_stop() { pkill -f "user-data-dir=/run/kiosk/bench" 2>/dev/null || true; sleep 1; rm -rf /run/kiosk/bench "$BENCH_POLICY"; urls_restore; }
 
 # chrome_gpu_status: the feature list of chrome://gpu (hardware accelerated or not)
 chrome_gpu_status() {
