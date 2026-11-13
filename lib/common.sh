@@ -114,3 +114,13 @@ has_gpu() {
     esac
     lspci -nn 2>/dev/null | grep -i 'vga\|3d\|display' | grep -q "\[${vid}:"
 }
+
+# --- browser (config: chrome.browser) ---
+# chrome   = Google Chrome (deb from Google), the default.
+# chromium = Chromium (deb from the xtradeb PPA; Ubuntu itself only ships a snap). Same flags, same
+#            policies, but its own binary and its own policy directory.
+kiosk_browser() { case "$(cfg '.chrome.browser' chrome)" in chromium) echo chromium ;; *) echo chrome ;; esac; }
+# browser_bin [chrome|chromium]  /  browser_policy_dir [chrome|chromium]   default: the configured one
+browser_bin()        { [ "${1:-$(kiosk_browser)}" = chromium ] && echo chromium || echo google-chrome-stable; }
+browser_policy_dir() { [ "${1:-$(kiosk_browser)}" = chromium ] && echo /etc/chromium/policies/managed || echo /etc/opt/chrome/policies/managed; }
+browser_version()    { "$(browser_bin)" --version 2>/dev/null | grep -o '[0-9][0-9.]*' | head -1; }

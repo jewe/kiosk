@@ -425,8 +425,10 @@ cmd_doctor() {
     check "sensors available"               "sensors"
     check "monitor timer enabled"           "systemctl is-enabled kiosk-monitor.timer"
     check "no failed repo sync"             "! cat ${KIOSK_DIR}/apps/*/state/*.json 2>/dev/null | jq -e 'select(.result==\"failed\")' >/dev/null"
-    if [ -f /etc/opt/chrome/policies/managed/kiosk-extensions.json ]; then
-        check "all forced extensions are served" "(for u in \$(jq -r '.ExtensionInstallForcelist[]' /etc/opt/chrome/policies/managed/kiosk-extensions.json | cut -d';' -f2); do curl -fsI --max-time 2 \"\$u\" >/dev/null || exit 1; done)"
+    local extpol; extpol="$(browser_policy_dir)/kiosk-extensions.json"
+    check "browser '$(kiosk_browser)' installed" "command -v $(browser_bin)"
+    if [ -f $extpol ]; then
+        check "all forced extensions are served" "(for u in \$(jq -r '.ExtensionInstallForcelist[]' $extpol | cut -d';' -f2); do curl -fsI --max-time 2 \"\$u\" >/dev/null || exit 1; done)"
     fi
     echo "  $ok ok, $bad failed"
     [ "$bad" -eq 0 ]
@@ -443,8 +445,12 @@ cmd_apply() {
     local cg cf
     cg="$(cfg '.chrome.gpu' auto)"; cf="$(cfg '(.chrome.flags // []) | join(" ")')"
     case "$cg" in auto|software) ;; *) warn "chrome.gpu must be auto or software"; cg=auto ;; esac
-    printf 'CHROME_GPU=%s\nCHROME_FLAGS="%s"\n' "$cg" "${cf//\"/\\\"}" | write_file "${KIOSK_STATE}/chrome.env" 0644 || true
+    local cl; cl="$(cfg '.chrome.lang')"
+    [[ -z "$cl" || "$cl" =~ ^[a-z]{2,3}(-[A-Z]{2})?$ ]] || { warn "chrome.lang '$cl' is not a language tag, ignored"; cl=""; }
+    printf 'CHROME_GPU=%s\nCHROME_FLAGS="%s"\nCHROME_BROWSER=%s\nCHROME_LANG=%s\n' "$cg" "${cf//\"/\\\"}" "$(kiosk_browser)" "$cl" | write_file "${KIOSK_STATE}/chrome.env" 0644 || true
     if [ -f /etc/systemd/system/kiosk-web@.service ] || [ -f /etc/systemd/system/kiosk-static@.service ]; then
+        # chrome.browser: install it on the first apply after a switch, move the policies to its directory
+        "${KIOSK_SYS}/apps/web/browser.sh" ensure || { warn "browser '$(kiosk_browser)' is not ready"; problems=1; }
         "${KIOSK_SYS}/apps/web/extensions.sh" apply || problems=1
     fi
     count="$(cfg '.apps | length' 0)"
@@ -470,7 +476,9 @@ cmd_apply() {
         systemctl disable --now "$u" >/dev/null 2>&1 || true
         n="${u#*@}"; n="${n%.service}"; t="${u#kiosk-}"; t="${t%%@*}"
         [ -x "${KIOSK_SYS}/apps/${t}/remove.sh" ] && "${KIOSK_SYS}/apps/${t}/remove.sh" "$n" || true
-        rm -f "${KIOSK_STATE}/apps/${n}.env"
+        # an app that kept its name but changed its type (web → static) is still wanted under the new
+        # unit: its env file was just rendered above and must stay
+        [[ " ${wanted[*]:-} " == *"@${n}.service "* ]] || rm -f "${KIOSK_STATE}/apps/${n}.env"
     done < <(systemctl list-units --all 'kiosk-*@*.service' --no-legend --plain 2>/dev/null | grep -v 'kiosk-content-update@')
     systemctl daemon-reload
 

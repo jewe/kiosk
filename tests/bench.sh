@@ -51,7 +51,7 @@ machine() {
     gpu="$(lspci -nn 2>/dev/null | grep -i 'vga\|3d\|display' | sed 's/^.*\]: //; s/ (rev.*//; s/ \[[0-9a-f]\{4\}:[0-9a-f]\{4\}\]//' | paste -sd'+' -)"   # all GPUs, e.g. "Intel ... UHD 630+NVIDIA ... RTX 3060"
     ram="$(free -m | awk '/^Mem:/ {print $2}')"
     xdrv="$(grep -o 'Loading.*/\(modesetting\|intel\|amdgpu\|nvidia\)_drv.so' /var/log/Xorg.0.log 2>/dev/null | tail -1 | sed 's#.*/##; s/_drv.so//')"
-    chrome="$(google-chrome-stable --version 2>/dev/null | grep -o '[0-9][0-9.]*' | head -1)"
+    chrome="$(browser_version)"; [ "$(kiosk_browser)" = chromium ] && chrome="chromium ${chrome}"
     levers="$(yq -c '{chrome_flags:(.chrome.flags // []), tearfree:(.display.tearfree // true), gpu_min_freq:(.performance.gpu_min_freq // "auto"), low_latency:(.performance.low_latency // false)}' "$KIOSK_CONFIG" 2>/dev/null || echo '{}')"
     jq -c -n --arg host "$(hostname)" --arg cpu "$cpu" --arg gpu "$gpu" --argjson ram "${ram:-0}" --arg kernel "$(uname -r)" \
         --arg os "$(. /etc/os-release 2>/dev/null; echo "${PRETTY_NAME:-}")" --arg xdrv "$xdrv" --arg chrome "$chrome" \
@@ -64,14 +64,14 @@ machine() {
 # chrome_start <url> [extra flags...]   Chrome with the production flags + DevTools port, as the kiosk user.
 # The kiosk policy disallows developer tools (DeveloperToolsAvailability=2), which also silences page-level
 # DevTools commands; a temporary policy file allows them for the benchmark only.
-BENCH_POLICY=/etc/opt/chrome/policies/managed/zz-bench.json
+BENCH_POLICY="$(browser_policy_dir)/zz-bench.json"
 chrome_start() {
     local url="$1"; shift
     local profile=/run/kiosk/bench
     rm -rf "$profile"; mkdir -p "$profile"; chown "$KIOSK_USER:$KIOSK_USER" "$profile"
     mkdir -p "$(dirname "$BENCH_POLICY")"; echo '{"DeveloperToolsAvailability": 1}' > "$BENCH_POLICY"
     CHROME_EXTRA_FLAGS="${CHROME_EXTRA_FLAGS:-} $*" chrome_flags bench "$profile"
-    xk setsid google-chrome-stable "${CHROME_ARGS[@]}" --remote-debugging-port=$PORT --remote-allow-origins='*' \
+    xk setsid "$(browser_bin)" "${CHROME_ARGS[@]}" --remote-debugging-port=$PORT --remote-allow-origins='*' \
         --window-position=0,0 --window-size="${BENCH_RES%x*},${BENCH_RES#*x}" --app="$url" >/dev/null 2>&1 < /dev/null &
     CHROME_PID=$!
 }

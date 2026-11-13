@@ -9,7 +9,7 @@ apt_install \
     pciutils usbutils lm-sensors lvm2 \
     htop nano less scrot \
     caja mate-terminal pluma eom udisks2 gvfs gvfs-backends gvfs-fuse mate-polkit \
-    network-manager autossh \
+    network-manager autossh rsync \
     pipewire pipewire-pulse wireplumber alsa-utils
 
 # NetworkManager handles WLAN later; keep netplan's ethernet config as is.

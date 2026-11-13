@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Starts Chrome in kiosk mode for app instance $1. Variables come from
+# Starts Chrome (or Chromium, chrome.browser) in kiosk mode for app instance $1. Variables come from
 # /opt/kiosk/state/apps/<name>.env (rendered by kioskctl apply):
 #   APP_URL, APP_SCREEN (primary|all|OUTPUT), APP_GEOMETRY (fullscreen|WxH+X+Y), APP_EXTRA_FLAGS
 # Global Chrome options come from /opt/kiosk/state/chrome.env (config: chrome.gpu, chrome.flags).
@@ -23,4 +23,6 @@ fi
 /opt/kiosksystem/apps/web/shader-cache.sh restore "$name" "$profile" || true
 
 chrome_flags "$name" "$profile"
-exec google-chrome-stable "${CHROME_ARGS[@]}" --window-position="${x},${y}" --window-size="${w},${h}" "${mode[@]}"
+# CHROME_BROWSER comes from /opt/kiosk/state/chrome.env (config: chrome.browser), sourced by chrome_flags
+bin=google-chrome-stable; [ "${CHROME_BROWSER:-chrome}" = chromium ] && bin=chromium
+exec "$bin" "${CHROME_ARGS[@]}" --window-position="${x},${y}" --window-size="${w},${h}" "${mode[@]}"

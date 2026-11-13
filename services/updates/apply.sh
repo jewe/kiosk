@@ -32,7 +32,7 @@ APT::Periodic::AutocleanInterval "7";
 Unattended-Upgrade::Allowed-Origins {
     ${origins}
 };
-Unattended-Upgrade::Package-Blacklist { "google-chrome-stable"; };
+Unattended-Upgrade::Package-Blacklist { "google-chrome-stable"; "chromium"; };
 Unattended-Upgrade::Remove-Unused-Dependencies "true";
 Unattended-Upgrade::Automatic-Reboot "$([ -n "$reboot" ] && echo true || echo false)";
 Unattended-Upgrade::Automatic-Reboot-Time "${reboot:-02:00}";

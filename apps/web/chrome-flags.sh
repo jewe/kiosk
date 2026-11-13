@@ -4,6 +4,8 @@
 #
 # Sources of extra flags, in order (later wins for simple flags):
 #   /opt/kiosk/state/chrome.env   CHROME_GPU=auto|software, CHROME_FLAGS="..."   (config: chrome.gpu / chrome.flags)
+#                                 CHROME_BROWSER=chrome|chromium (config: chrome.browser; read by the callers)
+#                                 CHROME_LANG=de|en-US|... (config: chrome.lang)
 #   APP_EXTRA_FLAGS               per app (config: apps[].extra_flags)
 #   CHROME_EXTRA_FLAGS            environment, used by `bench.sh ab`
 # --enable-features= / --disable-features= from all sources are merged into one flag each
@@ -40,6 +42,12 @@ chrome_flags() {
         --disable-breakpad
         --metrics-recording-only
     )
+    # chrome.lang: what a page sees as navigator.language and Accept-Language. On Linux --lang alone does
+    # not set the UI locale, Chrome takes that from LANGUAGE; exported here for the caller that execs it.
+    if [ -n "${CHROME_LANG:-}" ]; then
+        CHROME_ARGS+=(--lang="$CHROME_LANG" --accept-lang="$CHROME_LANG")
+        export LANGUAGE="$CHROME_LANG"
+    fi
     case "${CHROME_GPU:-auto}" in
         software) CHROME_ARGS+=(--disable-gpu) ;;
         *)        CHROME_ARGS+=(--ignore-gpu-blocklist) ;;

@@ -3,7 +3,8 @@
 #   - name: <folder>   private extension: source /opt/kiosk/extensions/src/<folder>, key secrets/extensions/<folder>.pem
 #   - id: <32 chars>   Web Store extension: downloaded once as .crx, then served locally (works offline)
 # Every extension is published as /opt/kiosk/extensions/pub/<id>/{<id>.crx,update.xml}, served by nginx on
-# http://127.0.0.1:8090/, and listed in /etc/opt/chrome/policies/managed/kiosk-extensions.json.
+# http://127.0.0.1:8090/, and listed in kiosk-extensions.json in the policy directory of the configured
+# browser (chrome.browser): /etc/opt/chrome/policies/managed or /etc/chromium/policies/managed.
 #   extensions.sh apply            (kioskctl apply)
 #   extensions.sh list
 #   extensions.sh update [id]      re-download Web Store entries
@@ -13,13 +14,14 @@ source "$(dirname "${BASH_SOURCE[0]}")/../../lib/common.sh"
 LOG_TAG="extensions"
 EXT_DIR="${KIOSK_DIR}/extensions"; SRC="${EXT_DIR}/src"; PUB="${EXT_DIR}/pub"
 KEYS="${KIOSK_SECRETS}/extensions"
-POLICY=/etc/opt/chrome/policies/managed/kiosk-extensions.json
+POLICY="$(browser_policy_dir)/kiosk-extensions.json"
+BROWSER_BIN="$(browser_bin)"
 BASE="http://127.0.0.1:8090"
 cmd="${1:-apply}"
 
 ext_id_from_key() { openssl rsa -in "$1" -pubout -outform DER 2>/dev/null | sha256sum | head -c 32 | tr '0-9a-f' 'a-p'; }
 crx_version()     { unzip -p "$1" manifest.json 2>/dev/null | jq -r '.version // empty'; }
-chrome_version()  { google-chrome-stable --version 2>/dev/null | grep -o '[0-9][0-9.]*' | head -1; }
+chrome_version()  { browser_version; }
 
 publish() {   # publish <id> <crx> <version>
     local id="$1" crx="$2" ver="$3"
@@ -46,10 +48,10 @@ pack_private() {   # pack_private <name> → sets EXT_ID, or returns 1
     if [ ! -f "$crx" ] || [ -n "$(find "$src" -newer "$crx" -print -quit)" ] || [ "$(crx_version "$crx")" != "$ver" ]; then
         tmp="$(mktemp -d /run/kiosk-pack.XXXXXX)"; cp -a "$src" "$tmp/$name"; cp "$key" "$tmp/key.pem"; chown -R "$KIOSK_USER" "$tmp"
         # Chrome packs without a window; HOME/user-data-dir on the temp dir keep the kiosk profile untouched
-        sudo -u "$KIOSK_USER" env -i HOME="$tmp" google-chrome-stable --headless=new --no-sandbox --user-data-dir="$tmp/profile" \
+        sudo -u "$KIOSK_USER" env -i HOME="$tmp" "$BROWSER_BIN" --headless=new --no-sandbox --user-data-dir="$tmp/profile" \
             --pack-extension="$tmp/$name" --pack-extension-key="$tmp/key.pem" >/dev/null 2>&1
         if [ -f "$tmp/$name.crx" ]; then publish "$id" "$tmp/$name.crx" "$ver"; log "'$name' packed: $id version $ver"
-        else rm -rf "$tmp"; warn "extension '$name': packing failed (google-chrome --pack-extension)"; return 1; fi
+        else rm -rf "$tmp"; warn "extension '$name': packing failed ($BROWSER_BIN --pack-extension)"; return 1; fi
         rm -rf "$tmp"
     fi
     EXT_ID="$id"
