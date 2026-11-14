@@ -1,0 +1,54 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>–</title>
+<!-- Served by the kiosk's nginx at http://127.0.0.1:8090/_kiosk/blocked.html; opened by the kiosk guard
+     extension when a link leads outside chrome.allowed_domains. ?t=<seconds>&back=<url>&close=0|1 -->
+<style>
+  html, body { margin: 0; height: 100%; background: #111; color: #eee; font: 2.2vmin/1.4 system-ui, sans-serif; cursor: default; user-select: none; }
+  main { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3vmin; text-align: center; padding: 0 5vmin; box-sizing: border-box; }
+  h1 { font-size: 3.6vmin; font-weight: 500; margin: 0; }
+  p { margin: 0; color: #aaa; }
+  button { font: inherit; font-size: 3vmin; color: #111; background: #eee; border: 0; border-radius: 1vmin; padding: 1.6vmin 5vmin; min-height: 48px; cursor: pointer; }
+  button:active { background: #ccc; }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="title"></h1>
+  <p id="info"></p>
+  <button id="back" type="button"></button>
+</main>
+<script>
+  const q = new URLSearchParams(location.search);
+  const t = Math.max(0, parseInt(q.get("t") || "5", 10) || 0);
+  const back = q.get("back") || "";
+  const close = q.get("close") === "1";
+  const de = /^de\b/i.test(navigator.language);
+  const L = de
+    ? { title: "Diese Seite ist hier nicht verfügbar.", back: "Zurück", closing: "Das Fenster schließt sich in {n} s.", returning: "Zurück in {n} s." }
+    : { title: "This page is not available here.", back: "Back", closing: "This window closes in {n} s.", returning: "Going back in {n} s." };
+  document.getElementById("title").textContent = L.title;
+  document.getElementById("back").textContent = L.back;
+
+  let done = false;
+  function goBack() {
+    if (done) return; done = true;
+    if (close) { window.close(); return; }   // the extension closes the tab as well
+    // history: ..., last allowed page, blocked URL (error page), this page → two steps back keeps the
+    // app's state (scroll position, single-page app route); without that history, load the last allowed URL
+    if (history.length > 2) history.go(-2);
+    else if (back) location.replace(back);
+    else history.back();
+  }
+  document.getElementById("back").addEventListener("click", goBack);
+
+  let n = t;
+  const info = document.getElementById("info");
+  const tick = () => { info.textContent = (close ? L.closing : L.returning).replace("{n}", n); if (n-- <= 0) goBack(); else setTimeout(tick, 1000); };
+  tick();
+</script>
+</body>
+</html>

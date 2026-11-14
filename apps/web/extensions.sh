@@ -5,6 +5,8 @@
 # Every extension is published as /opt/kiosk/extensions/pub/<id>/{<id>.crx,update.xml}, served by nginx on
 # http://127.0.0.1:8090/, and listed in kiosk-extensions.json in the policy directory of the configured
 # browser (chrome.browser): /etc/opt/chrome/policies/managed or /etc/chromium/policies/managed.
+# With chrome.allowed_domains set, the built-in extension kiosk-guard (apps/web/kiosk-guard) is added: it sends
+# blocked navigations to http://127.0.0.1:8090/_kiosk/blocked.html, which goes back after chrome.blocked_return s.
 #   extensions.sh apply            (kioskctl apply)
 #   extensions.sh list
 #   extensions.sh update [id]      re-download Web Store entries
@@ -91,13 +93,32 @@ NGX
     nginx -t >/dev/null 2>&1 && systemctl reload-or-restart nginx || warn "nginx config test failed"
 }
 
+# guard_prepare → 0 when the guard is wanted (chrome.allowed_domains not empty): its source is synced to
+# $SRC/kiosk-guard with config.js, the blocked page published under $PUB/_kiosk
+guard_prepare() {
+    local ret
+    if [ "$(cfg '.chrome.allowed_domains // [] | length' 0)" -eq 0 ]; then rm -rf "$PUB/_kiosk"; return 1; fi
+    ret="$(cfg '.chrome.blocked_return' 5)"; [[ "$ret" =~ ^[0-9]+$ ]] || { warn "chrome.blocked_return must be seconds, using 5"; ret=5; }
+    mkdir -p "$SRC/kiosk-guard" "$PUB/_kiosk"
+    # cp -p keeps the repo mtimes, so pack_private only repacks after a real change
+    cp -p "${KIOSK_SYS}/apps/web/kiosk-guard/"* "$SRC/kiosk-guard/"
+    echo "self.KIOSK_GUARD = { returnAfter: $ret };" | write_file "$SRC/kiosk-guard/config.js" 0644 || true
+    chown -R "$KIOSK_USER:$KIOSK_USER" "$SRC/kiosk-guard"
+    install -m 0644 "${KIOSK_SYS}/apps/web/blocked.html" "$PUB/_kiosk/blocked.html"
+}
+
 apply() {
-    local n i name id ids=() ok=0
+    local n i name id ids=() ok=0 guard=0
     mkdir -p "$SRC" "$PUB"; chown "$KIOSK_USER:$KIOSK_USER" "$SRC"
     n="$(cfg '.chrome.extensions | length' 0)"
-    [ "$n" -gt 0 ] && ensure_nginx
+    guard_prepare && guard=1
+    [ "$n" -gt 0 ] || [ "$guard" -eq 1 ] && ensure_nginx
+    if [ "$guard" -eq 1 ]; then
+        EXT_ID=""; pack_private kiosk-guard && ids+=("$EXT_ID") || warn "kiosk-guard could not be packed: blocked pages have no way back"
+    fi
     for ((i=0; i<n; i++)); do
         name="$(cfg ".chrome.extensions[$i].name")"; id="$(cfg ".chrome.extensions[$i].id")"
+        [ "$name" = kiosk-guard ] && { warn "chrome.extensions: the name kiosk-guard is reserved, skipped"; continue; }
         if [ -n "$name" ]; then EXT_ID=""; pack_private "$name" || continue; id="$EXT_ID"
         elif [ -n "$id" ]; then fetch_store "$id" || continue
         else warn "chrome.extensions[$i]: needs name or id"; continue; fi
@@ -116,6 +137,7 @@ apply() {
     # drop published extensions that are no longer configured
     for d in "$PUB"/*/; do
         [ -d "$d" ] || continue; id="$(basename "$d")"
+        [ "$id" = _kiosk ] && continue   # the blocked page (guard_prepare)
         [[ " ${ids[*]:-} " == *" $id "* ]] || { rm -rf "$d"; log "removed $id"; }
     done
     return 0
@@ -125,7 +147,7 @@ list() {
     local d id ver src served
     printf '%-34s %-10s %-8s %s\n' id version served source
     for d in "$PUB"/*/; do
-        [ -d "$d" ] || continue; id="$(basename "$d")"; ver="$(crx_version "$d/$id.crx")"
+        [ -d "$d" ] || continue; id="$(basename "$d")"; [ "$id" = _kiosk ] && continue; ver="$(crx_version "$d/$id.crx")"
         src="webstore"; for k in "$KEYS"/*.pem; do [ -f "$k" ] && [ "$(ext_id_from_key "$k")" = "$id" ] && src="$(basename "$k" .pem) (private)"; done
         served="no"; curl -fsI --max-time 2 "$BASE/$id/update.xml" >/dev/null 2>&1 && served="yes"
         printf '%-34s %-10s %-8s %s\n' "$id" "${ver:-?}" "$served" "$src"

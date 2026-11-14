@@ -68,6 +68,7 @@ chrome:
   allowed_domains: []        # only these may be opened, e.g. [example.com, .api.example.org]; empty = no restriction.
                              # example.com includes subdomains, .example.com is this host only; 127.0.0.1 and
                              # the hosts of the web apps' urls are always allowed
+  blocked_return: 5          # a blocked link shows a notice with a Back button and goes back after this many seconds
   extensions: []             # force-installed extensions, see docs/extensions.md
   # - name: hello            # private: source in /opt/kiosk/extensions/src/hello, key in secrets/extensions/hello.pem
   # - id: cjpalhdlnbpafiamejdnhcphjbkeiagm   # Web Store ID: downloaded once, then served locally

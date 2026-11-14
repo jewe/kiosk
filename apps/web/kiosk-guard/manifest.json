@@ -1,0 +1,4 @@
+{ "manifest_version": 3, "name": "Kiosk guard", "version": "1.0",
+  "description": "way back from pages blocked by chrome.allowed_domains (installed by the kiosk system)",
+  "permissions": ["webNavigation", "tabs", "storage"],
+  "background": { "service_worker": "background.js" } }
