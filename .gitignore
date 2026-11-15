@@ -6,3 +6,4 @@ secrets/*
 !secrets/README.md
 docs/
 config/kiosk.yaml
+.claude/skills/kiosk-install
