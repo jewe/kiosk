@@ -15,10 +15,11 @@ def want_interval($path): if . != null and (is_interval | not) then err("\($path
 # top level
 unknown("top level"; ["device","display","touch","audio","chrome","performance","apps","network","services","schedule","security","persistence"]),
 (.device | unknown("device"; ["id"])), (.device.id | want_str("device.id")),
-(.display | unknown("display"; ["background","tearfree","outputs","rotate","splash"])),
+(.display | unknown("display"; ["background","tearfree","outputs","rotate","splash","cursor"])),
 (.display.rotate | want_enum("display.rotate"; ["normal","left","right","inverted"])),
 (.display.tearfree | want_bool("display.tearfree")),
 (.display.splash | want_bool("display.splash")),
+(.display.cursor | want_enum("display.cursor"; ["hide","show"])),
 (.display.outputs // [] | if type != "array" then err("display.outputs must be a list") else
     to_entries[] | .key as $i | .value |
     (unknown("display.outputs[\($i)]"; ["name","primary","mode","pos","rotate","rate","enabled","transform"])),

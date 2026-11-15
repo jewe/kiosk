@@ -142,7 +142,8 @@ H
 ;;      files|cursor) cat <<'H'
 sudo kioskctl files [dir]         open caja on the kiosk screen (default /opt/kiosk) with the cursor visible;
                                   needs tools/install.sh mate. Close it with Ctrl+Alt+Q in dev mode
-sudo kioskctl cursor show|hide    show or hide the mouse pointer (unclutter)
+sudo kioskctl cursor show|hide    show or hide the mouse pointer (unclutter) until the next apply/restart;
+                                  permanent: display.cursor: show|hide in kiosk.yaml
 H
 ;;      devmode) cat <<'H'
 sudo kioskctl devmode on|off
@@ -247,6 +248,10 @@ cursor_show() {
     # -x cannot match names longer than 15 characters; match the start of the command line instead
     pkill -u "$KIOSK_USER" -f '^unclutter-xfixes' 2>/dev/null || true
     sudo -u "$KIOSK_USER" env "${XENV[@]}" xsetroot -cursor_name left_ptr 2>/dev/null || true
+}
+# cursor_apply: what the config (display.cursor) and dev mode ask for
+cursor_apply() {
+    if [ -f "${KIOSK_STATE}/devmode" ] || [ "$(cfg '.display.cursor' hide)" = show ]; then cursor_show; else cursor_hide; fi
 }
 cursor_hide() {
     pgrep -u "$KIOSK_USER" -f '^unclutter-xfixes' >/dev/null && return 0
@@ -486,6 +491,7 @@ cmd_apply() {
     if x_running; then
         [ "$(fgconsole 2>/dev/null)" = 1 ] || { chvt 1 && log "switched back to tty1 (a text console was active)"; }
         as_kiosk_x "${KIOSK_SYS}/display/apply-display.sh" || true
+        cursor_apply   # display.cursor
         if systemctl is-active kiosk.target >/dev/null 2>&1; then
             for u in "${wanted[@]:-}"; do [ -n "$u" ] && systemctl restart "$u" || true; done
         fi
@@ -717,7 +723,7 @@ case "${1:-}" in
               rc="${KIOSK_SYS}/display/openbox/rc.xml"; [ -f "${KIOSK_STATE}/devmode" ] && rc="${KIOSK_SYS}/display/openbox/rc-dev.xml"
               ln -sfn "$rc" "${KIOSK_STATE}/openbox-rc.xml"; chown -h "$KIOSK_USER:$KIOSK_USER" "${KIOSK_STATE}/openbox-rc.xml"
               x_running && sudo -u "$KIOSK_USER" env "${XENV[@]}" openbox --reconfigure >/dev/null 2>&1 || true
-              if x_running; then [ "${2}" = on ] && cursor_show || cursor_hide; fi
+              x_running && cursor_apply
               log "devmode ${2}" ;;
     secrets)  require_root
               case "${2:-}" in
