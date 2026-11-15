@@ -38,7 +38,9 @@ XML
 }
 
 pack_private() {   # pack_private <name> → sets EXT_ID, or returns 1
-    local name="$1" src="$SRC/$name" key="$KEYS/$name.pem" id crx ver tmp
+    # two lines: `local` expands all its words first, so src/key on the same line would see the caller's $name
+    local name="$1" id crx ver tmp
+    local src="$SRC/$name" key="$KEYS/$name.pem"
     [[ "$name" =~ ^[a-z0-9_-]+$ ]] || { warn "extension name '$name' must be [a-z0-9_-]"; return 1; }
     [ -f "$src/manifest.json" ] || { warn "extension '$name': no $src/manifest.json"; return 1; }
     if [ ! -f "$key" ]; then
