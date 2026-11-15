@@ -23,8 +23,9 @@ bg="$(cfg '.display.background' '')"
 
 /opt/kiosksystem/services/audio/apply.sh || true
 
-# pointer hidden in production (display.cursor: hide); visible with display.cursor: show and in dev mode
-[ -f "${KIOSK_STATE}/devmode" ] || [ "$(cfg '.display.cursor' hide)" = show ] || unclutter-xfixes --start-hidden --hide-on-touch --timeout 1 --fork >/dev/null 2>&1 || true
+# pointer hidden in production (display.cursor: hide); visible with display.cursor: show, in dev mode and after
+# `kioskctl cursor show`. All of them start X without -nocursor (KIOSK_X_CURSOR from kiosk-session.service).
+[ "${KIOSK_X_CURSOR--nocursor}" = -nocursor ] && unclutter-xfixes --start-hidden --hide-on-touch --timeout 1 --fork >/dev/null 2>&1 || true
 
 # openbox reads its config through a symlink so `kioskctl devmode` can switch it and reconfigure in place
 rc=/opt/kiosksystem/display/openbox/rc.xml

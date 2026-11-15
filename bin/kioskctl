@@ -142,13 +142,14 @@ H
 ;;      files|cursor) cat <<'H'
 sudo kioskctl files [dir]         open caja on the kiosk screen (default /opt/kiosk) with the cursor visible;
                                   needs tools/install.sh mate. Close it with Ctrl+Alt+Q in dev mode
-sudo kioskctl cursor show|hide    show or hide the mouse pointer (unclutter) until the next apply/restart;
+sudo kioskctl cursor show|hide    show or hide the mouse pointer until the next apply (may restart X: -nocursor);
                                   permanent: display.cursor: show|hide in kiosk.yaml
 H
 ;;      devmode) cat <<'H'
 sudo kioskctl devmode on|off
   on: openbox hotkeys Ctrl+Alt+T (terminal), Ctrl+Alt+F (files), Ctrl+Alt+C (Chrome window), Ctrl+Alt+Q
-  (close window), Alt+Tab, Alt+drag; cursor visible. off: production, no hotkeys. See docs/shortcuts.md
+  (close window), Alt+Tab, Alt+drag; cursor visible (restarts X once to drop -nocursor). off: production,
+  no hotkeys, pointer as display.cursor says. See docs/shortcuts.md
 H
 ;;      screenshot) cat <<'H'
 sudo kioskctl screenshot [file]              PNG of the whole screen (default /opt/kiosk/data/screenshots/<ts>.png)
@@ -249,6 +250,29 @@ cursor_show() {
     pkill -u "$KIOSK_USER" -f '^unclutter-xfixes' 2>/dev/null || true
     sudo -u "$KIOSK_USER" env "${XENV[@]}" xsetroot -cursor_name left_ptr 2>/dev/null || true
 }
+# x_cursor_sync [on|off]  Xorg's -nocursor hides the pointer whatever unclutter does, so a visible pointer needs
+# X started without it. Wanted: on with display.cursor: show or dev mode (or the argument). The session unit reads
+# the flag from session.env; the unit file comes from the repo and is refreshed here (setup installs it only
+# once). When the running X has the other flag, the X session restarts (the apps restart with it).
+x_cursor_sync() {
+    local want="${1:-}" xc=-nocursor xhas=-nocursor
+    [ -f /etc/systemd/system/kiosk-session.service ] || return 0
+    if [ -z "$want" ]; then
+        if [ -f "${KIOSK_STATE}/devmode" ] || [ "$(cfg '.display.cursor' hide)" = show ]; then want=on; else want=off; fi
+    fi
+    [ "$want" = on ] && xc=""
+    printf 'KIOSK_X_CURSOR=%s\n' "$xc" | write_file "${KIOSK_STATE}/session.env" 0644 || true
+    write_file /etc/systemd/system/kiosk-session.service 0644 < "${KIOSK_SYS}/services/kiosk-session.service" && systemctl daemon-reload
+    if systemctl is-active -q kiosk-session.service; then
+        pgrep -a Xorg | grep -q -- ' -nocursor' || xhas=""
+        if [ "$xhas" != "$xc" ]; then
+            log "pointer ${want}: restarting the X session (apps restart with it)"
+            systemctl restart kiosk-session.service
+            for _ in $(seq 1 20); do x_running && break; sleep 1; done
+        fi
+    fi
+}
+
 # cursor_apply: what the config (display.cursor) and dev mode ask for
 cursor_apply() {
     if [ -f "${KIOSK_STATE}/devmode" ] || [ "$(cfg '.display.cursor' hide)" = show ]; then cursor_show; else cursor_hide; fi
@@ -487,18 +511,7 @@ cmd_apply() {
     done < <(systemctl list-units --all 'kiosk-*@*.service' --no-legend --plain 2>/dev/null | grep -v 'kiosk-content-update@')
     systemctl daemon-reload
 
-    # --- X server options (display.cursor): the unit reads them from session.env; the unit file itself comes
-    # from the repo and is refreshed here, since setup installs it only once. A changed flag restarts X.
-    if [ -f /etc/systemd/system/kiosk-session.service ]; then
-        local xc=-nocursor xhas=-nocursor
-        [ "$(cfg '.display.cursor' hide)" = show ] && xc=""
-        printf 'KIOSK_X_CURSOR=%s\n' "$xc" | write_file "${KIOSK_STATE}/session.env" 0644 || true
-        write_file /etc/systemd/system/kiosk-session.service 0644 < "${KIOSK_SYS}/services/kiosk-session.service" && systemctl daemon-reload
-        if systemctl is-active -q kiosk-session.service; then
-            pgrep -a Xorg | grep -q -- ' -nocursor' || xhas=""
-            if [ "$xhas" != "$xc" ]; then log "display.cursor changed: restarting the X session"; systemctl restart kiosk-session.service; sleep 3; fi
-        fi
-    fi
+    x_cursor_sync   # display.cursor / dev mode → Xorg -nocursor or not
 
     # --- display: live re-apply when X is up, restart apps ---
     if x_running; then
@@ -736,6 +749,7 @@ case "${1:-}" in
               rc="${KIOSK_SYS}/display/openbox/rc.xml"; [ -f "${KIOSK_STATE}/devmode" ] && rc="${KIOSK_SYS}/display/openbox/rc-dev.xml"
               ln -sfn "$rc" "${KIOSK_STATE}/openbox-rc.xml"; chown -h "$KIOSK_USER:$KIOSK_USER" "${KIOSK_STATE}/openbox-rc.xml"
               x_running && sudo -u "$KIOSK_USER" env "${XENV[@]}" openbox --reconfigure >/dev/null 2>&1 || true
+              x_cursor_sync   # a visible pointer needs X without -nocursor
               x_running && cursor_apply
               log "devmode ${2}" ;;
     secrets)  require_root
@@ -766,7 +780,8 @@ case "${1:-}" in
                   setsid caja --no-desktop "${2:-/opt/kiosk}" >/dev/null 2>&1 < /dev/null &
               log "caja opened, cursor visible (close with Ctrl+Alt+Q in dev mode; hide the cursor again: kioskctl cursor hide)" ;;
     cursor)   require_root; x_running || die "X is not running"
-              case "${2:-}" in show) cursor_show; log "cursor shown" ;; hide) cursor_hide; log "cursor hidden" ;; *) usage; exit 1 ;; esac ;;
+              # until the next apply / devmode switch, which go back to display.cursor and dev mode
+              case "${2:-}" in show) x_cursor_sync on; cursor_show; log "cursor shown" ;; hide) x_cursor_sync off; cursor_hide; log "cursor hidden" ;; *) usage; exit 1 ;; esac ;;
     usb)      require_root
               case "${2:-list}" in
                   list)  lsblk -o NAME,SIZE,FSTYPE,LABEL,MOUNTPOINTS,TRAN -p | awk 'NR==1 || /usb/ || /^[├└│ ]/' ;;
