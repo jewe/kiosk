@@ -19,8 +19,12 @@ UtmpIdentifier=tty1
 WorkingDirectory=/home/kiosk
 Environment=XDG_SESSION_TYPE=x11
 Environment=XDG_RUNTIME_DIR=/run/user/%U
+# display.cursor: hide → -nocursor (no pointer at all until a mouse moves; unclutter then hides it again),
+# show → empty. Written by kioskctl apply; the default applies before the first apply.
+Environment=KIOSK_X_CURSOR=-nocursor
+EnvironmentFile=-/opt/kiosk/state/session.env
 ExecStartPre=/bin/rm -f /home/kiosk/.Xauthority
-ExecStart=/usr/bin/startx /opt/kiosksystem/display/xsession.sh -- /usr/bin/X :0 vt1 -nolisten tcp -nocursor -keeptty -quiet
+ExecStart=/usr/bin/startx /opt/kiosksystem/display/xsession.sh -- /usr/bin/X :0 vt1 -nolisten tcp $KIOSK_X_CURSOR -keeptty -quiet
 Restart=always
 RestartSec=3
 TimeoutStopSec=10

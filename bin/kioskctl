@@ -487,6 +487,19 @@ cmd_apply() {
     done < <(systemctl list-units --all 'kiosk-*@*.service' --no-legend --plain 2>/dev/null | grep -v 'kiosk-content-update@')
     systemctl daemon-reload
 
+    # --- X server options (display.cursor): the unit reads them from session.env; the unit file itself comes
+    # from the repo and is refreshed here, since setup installs it only once. A changed flag restarts X.
+    if [ -f /etc/systemd/system/kiosk-session.service ]; then
+        local xc=-nocursor xhas=-nocursor
+        [ "$(cfg '.display.cursor' hide)" = show ] && xc=""
+        printf 'KIOSK_X_CURSOR=%s\n' "$xc" | write_file "${KIOSK_STATE}/session.env" 0644 || true
+        write_file /etc/systemd/system/kiosk-session.service 0644 < "${KIOSK_SYS}/services/kiosk-session.service" && systemctl daemon-reload
+        if systemctl is-active -q kiosk-session.service; then
+            pgrep -a Xorg | grep -q -- ' -nocursor' || xhas=""
+            if [ "$xhas" != "$xc" ]; then log "display.cursor changed: restarting the X session"; systemctl restart kiosk-session.service; sleep 3; fi
+        fi
+    fi
+
     # --- display: live re-apply when X is up, restart apps ---
     if x_running; then
         [ "$(fgconsole 2>/dev/null)" = 1 ] || { chvt 1 && log "switched back to tty1 (a text console was active)"; }
