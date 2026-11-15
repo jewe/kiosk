@@ -19,12 +19,28 @@ chrome.webNavigation.onCompleted.addListener(remember);
 chrome.webNavigation.onHistoryStateUpdated.addListener(remember);   // single-page apps (pushState)
 chrome.tabs.onRemoved.addListener(tabId => chrome.storage.session.remove(key(tabId)));
 
+// Chrome commits its own "blocked" error page right after onErrorOccurred, and that commit aborts a
+// navigation started at once (ERR_ABORTED). So the redirect waits a moment and is retried when aborted.
+const pending = new Map();   // tabId → { url, tries }
+const go = tabId => {
+  const p = pending.get(tabId); if (!p) return;
+  setTimeout(() => chrome.tabs.update(tabId, { url: p.url }).catch(() => pending.delete(tabId)), 150 * p.tries);
+};
+
 chrome.webNavigation.onErrorOccurred.addListener(async d => {
-  if (d.frameId !== 0 || !/BLOCKED_BY_ADMINISTRATOR/.test(d.error)) return;
+  if (d.frameId !== 0) return;
+  if (d.url.startsWith(PAGE)) {   // our redirect was aborted: try again, a few times
+    const p = pending.get(d.tabId);
+    if (p && /ERR_ABORTED/.test(d.error) && ++p.tries <= 5) go(d.tabId); else pending.delete(d.tabId);
+    return;
+  }
+  if (!/BLOCKED_BY_ADMINISTRATOR/.test(d.error)) return;
   const back = (await chrome.storage.session.get(key(d.tabId)))[key(d.tabId)] || "";
   const tabs = await chrome.tabs.query({});
   const close = !back && tabs.length > 1;   // opened by a link (target=_blank, window.open)
   const q = new URLSearchParams({ t: String(CFG.returnAfter), back, close: close ? "1" : "0" });
-  chrome.tabs.update(d.tabId, { url: PAGE + "?" + q });
-  if (close) setTimeout(() => chrome.tabs.remove(d.tabId).catch(() => {}), Math.max(0, CFG.returnAfter) * 1000);
+  pending.set(d.tabId, { url: PAGE + "?" + q, tries: 1 });
+  go(d.tabId);
+  if (close) setTimeout(() => chrome.tabs.remove(d.tabId).catch(() => {}), Math.max(0, CFG.returnAfter) * 1000 + 500);
 });
+chrome.webNavigation.onCompleted.addListener(d => { if (d.frameId === 0 && d.url.startsWith(PAGE)) pending.delete(d.tabId); });

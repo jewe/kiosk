@@ -86,7 +86,7 @@ server {
     listen 127.0.0.1:8090;
     root ${PUB};
     access_log off;
-    types { application/x-chrome-extension crx; text/xml xml; }
+    types { application/x-chrome-extension crx; text/xml xml; text/html html; }   # html: the blocked page in _kiosk/
     add_header Cache-Control no-cache;
 }
 NGX
