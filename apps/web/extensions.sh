@@ -112,6 +112,12 @@ guard_prepare() {
 apply() {
     local n i name id ids=() ok=0 guard=0
     mkdir -p "$SRC" "$PUB"; chown "$KIOSK_USER:$KIOSK_USER" "$SRC"
+    # nginx's stock default site listens on 0.0.0.0:80; nothing here needs it (core/11_boot.sh relies on that)
+    if [ -L /etc/nginx/sites-enabled/default ]; then
+        rm -f /etc/nginx/sites-enabled/default
+        systemctl is-active nginx >/dev/null 2>&1 && { nginx -t >/dev/null 2>&1 && systemctl reload nginx || true; }
+        log "nginx default site (port 80) removed"
+    fi
     n="$(cfg '.chrome.extensions | length' 0)"
     guard_prepare && guard=1
     [ "$n" -gt 0 ] || [ "$guard" -eq 1 ] && ensure_nginx

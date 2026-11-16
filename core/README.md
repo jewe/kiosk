@@ -12,4 +12,4 @@
 | 08_display | → `display/install.sh` |
 | 09_branding | → `branding/install.sh` |
 | 10_config | default `kiosk.yaml`, secrets templates, first `kioskctl apply` |
-| 11_boot | kdump removed, unused services masked (cloud-init, multipath, iscsi, apport, ...), GRUB timeout 0 |
+| 11_boot | kdump removed, unused services masked (cloud-init, multipath, iscsi, apport, ...), GRUB timeout 0 and text mode, ufw loaded in parallel with the network instead of before it |

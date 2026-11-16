@@ -8,6 +8,8 @@ require_root
 # the configured browser (chrome.browser) and its policies; also run by `kioskctl apply`
 "${KIOSK_SYS}/apps/web/browser.sh" ensure
 apt_install nginx unzip curl   # extensions are served from 127.0.0.1:8090 (apps/web/extensions.sh)
+rm -f /etc/nginx/sites-enabled/default   # stock site on 0.0.0.0:80, not used
+systemctl reload nginx 2>/dev/null || true
 
 install -m 0644 "${KIOSK_SYS}/apps/web/kiosk-web@.service" /etc/systemd/system/
 systemctl daemon-reload

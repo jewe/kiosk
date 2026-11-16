@@ -35,4 +35,37 @@ if [ -f /etc/default/grub ] && grep -q '^GRUB_TIMEOUT=1' /etc/default/grub; then
     sed -i 's/^GRUB_TIMEOUT=1/GRUB_TIMEOUT=0/' /etc/default/grub
     run_on_real_root update-grub >/dev/null 2>&1 && log "GRUB timeout 0" || warn "update-grub failed"
 fi
+
+# GRUB in text mode: gfxterm (mode switch + font from LVM) cost 2.7 s in the loader on a Celeron N3000
+# (wetho, 7.8 → 5.0 s). The menu is hidden anyway; plymouth still draws the splash from the kernel's framebuffer.
+if [ -d /etc/default/grub.d ] && [ ! -f /etc/default/grub.d/80-kiosk-terminal.cfg ]; then
+    echo 'GRUB_TERMINAL=console' > /etc/default/grub.d/80-kiosk-terminal.cfg
+    run_on_real_root update-grub >/dev/null 2>&1 && log "GRUB text mode" || warn "update-grub failed"
+fi
+
+# ufw no longer holds back the network: the stock unit is ordered Before=network-pre.target, so NetworkManager,
+# network.target, systemd-user-sessions and with them the kiosk session waited 4-5 s for the iptables-nft rules
+# on slow CPUs. Loaded in parallel instead. The gap is harmless as long as nothing but sshd (allowed by ufw anyway)
+# listens on the network: nginx serves on 127.0.0.1 only (its default site is removed by apps/web). A drop-in
+# cannot remove Before=, hence a full copy of the unit; undo with rm + daemon-reload.
+if [ -f /usr/lib/systemd/system/ufw.service ]; then
+    write_file /etc/systemd/system/ufw.service <<'UFW' && systemctl daemon-reload && log "ufw loads in parallel with the network" || true
+# kiosk: copy of the ufw unit without Before=/Wants=network-pre.target (core/11_boot.sh)
+[Unit]
+Description=Uncomplicated firewall
+Documentation=man:ufw(8)
+DefaultDependencies=no
+Wants=local-fs.target
+After=local-fs.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/lib/ufw/ufw-init start quiet
+ExecStop=/usr/lib/ufw/ufw-init stop
+
+[Install]
+WantedBy=multi-user.target
+UFW
+fi
 log "done"
