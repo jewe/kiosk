@@ -99,6 +99,8 @@ Any user with SSH access to the server can be the jump user; it needs `AllowTcpF
   60 s, then growing to 10 min between attempts (`RestartSec=60`, `RestartSteps=4`, `RestartMaxDelaySec=600`).
   The counter only resets on a manual start/restart (`kioskctl apply` does that), so a device with flaky network
   can take up to 10 min to come back after an outage.
+- At boot `ExecStartPre` waits up to 60 s until the server name resolves (network-online is reached before DNS
+  works; without the wait the first attempt fails and the tunnel comes up only after the 60 s backoff).
 - `ServerAliveInterval 30` × 3: a dead connection is noticed within ~90 s. The server does the same
   (`ClientAliveInterval`), so a stale forward frees the port and the reconnect does not hit `ExitOnForwardFailure`.
 - Server host key: accepted on first connect (`accept-new`) into `/opt/kiosk/secrets/tunnel/known_hosts`.
@@ -114,4 +116,7 @@ Any user with SSH access to the server can be the jump user; it needs `AllowTcpF
   (`sudo systemctl stop kiosk-tunnel`), wait out the hour or unban from elsewhere: `fail2ban-client set sshd unbanip <ip>`.
 - **Same port on two devices:** the second one fails with `remote port forwarding failed` and retries forever.
   `server.sh add` refuses a port already used by another key.
+- **Working through the tunnel:** `kioskctl apply` restarts `kiosk-tunnel` and with it cuts your own session.
+  Run it detached: `sudo systemd-run --unit kiosk-apply-remote kioskctl apply`, reconnect after ~1 min, read the
+  result with `journalctl -u kiosk-apply-remote`. Same for anything that touches the network.
 - **Reinstalled device:** new key pair → `add` again with the same name (replaces the old line).
