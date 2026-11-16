@@ -370,7 +370,7 @@ status_dynamic_json() {
     for n in $(app_names); do
         [ $first -eq 1 ] || apps="$apps,"; first=0
         apps="$apps$(jq -c -n --arg name "$n" --arg state "$(systemctl is-active "$(app_unit "$n")" 2>/dev/null || echo unknown)" \
-            --argjson repos "$(cat "${KIOSK_DIR}/apps/${n}/state"/*.json 2>/dev/null | jq -sc 'map({name,commit,updated:.ts,size_mb,lfs,result})' 2>/dev/null || echo '[]')" \
+            --argjson repos "$({ cat "${KIOSK_DIR}/apps/${n}/state"/*.json 2>/dev/null || true; } | jq -sc 'map({name,commit,updated:.ts,size_mb,lfs,result})' 2>/dev/null || echo '[]')" \
             '{name:$name, state:$state, repos:$repos}')"
     done
     apps="$apps]"
