@@ -25,6 +25,7 @@ Configuration
   extension list|update [id]|id <name>   Chrome extensions (config chrome.extensions)
   secrets git-key [label] [--rsa]|tunnel-key|list   deploy keys (ed25519, --rsa for old git servers) and the tunnel key
   update                     git pull system repo, re-run setup, re-apply
+  hostname [name]            show or set the host name (/etc/hostname, /etc/hosts), then reboot; needs rw mode
 
 Persistence
   storage status|init [SIZE]|grow [SIZE|max]   persistent volume for /opt/kiosk (init default 20G)
@@ -175,7 +176,14 @@ sudo kioskctl bench ab "" "--enable-features=Vulkan" [rounds]   two flag sets al
   Levers and reference scores: docs/performance.md
 H
 ;;      version) echo "kioskctl version    VERSION file and git revision of /opt/kiosksystem" ;;
-        help) echo "kioskctl help [command]   this overview, or details of one command" ;;
+        hostname) cat <<'H'
+kioskctl hostname               print the host name
+sudo kioskctl hostname kiosk-04 rename this kiosk (hostnamectl, the 127.0.1.1 line in /etc/hosts) and reboot.
+  Lowercase a-z, 0-9 and '-', max 63 characters. Refused while the root is overlaid (locked/data modes: the
+  change would be lost at reboot); switch to rw first. Everything else (status, heartbeat, screenshots,
+  Telegram caption, device.id when empty) reads the name at run time. On the Mac: rename secrets/<old> to secrets/<new>.
+H
+;;      help) echo "kioskctl help [command]   this overview, or details of one command" ;;
         *) echo "unknown command '$c'"; usage; return 1 ;;
     esac
 }
@@ -680,6 +688,26 @@ cmd_update() {
 
 # ---------- wifi (on-site) ----------
 # Profile "onsite" sits below the configured service WLANs (priority 50) and is not managed by services/wifi.
+# kioskctl hostname [name]: print or change the host name, then reboot.
+cmd_hostname() {
+    local new="${1:-}" old
+    old="$(hostname)"
+    [ -n "$new" ] || { echo "$old"; return 0; }
+    require_root
+    [[ "$new" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$ ]] || die "invalid host name '$new': lowercase a-z, 0-9 and '-', max 63, no '-' at either end"
+    [ "$new" != "$old" ] || { log "host name is already $new"; return 0; }
+    overlayroot_active && die "root is overlaid ($(persistence_mode)): the new name would be lost at reboot. Switch first: kioskctl mount rw, reboot"
+    hostnamectl set-hostname "$new"
+    # replace the old name as a whole field (not inside longer names), keep comment lines; make sure 127.0.1.1 names it
+    awk -v o="$old" -v n="$new" '!/^[[:space:]]*#/ { for (i = 2; i <= NF; i++) if ($i == o) $i = n } { print }' /etc/hosts > /etc/hosts.kiosk-new
+    awk -v n="$new" '$1 == "127.0.1.1" { for (i = 2; i <= NF; i++) if ($i == n) f = 1 } END { exit !f }' /etc/hosts.kiosk-new \
+        || echo "127.0.1.1 $new" >> /etc/hosts.kiosk-new
+    cat /etc/hosts.kiosk-new > /etc/hosts; rm -f /etc/hosts.kiosk-new
+    # the running X session keys its cookie by the old name: reboot so X, the apps and the journal use the new one
+    log "host name changed: $old -> $new, rebooting (on the Mac: rename secrets/$old to secrets/$new)"
+    systemctl reboot
+}
+
 cmd_wifi() {
     command -v nmcli >/dev/null || die "NetworkManager (nmcli) not installed"
     local sub="${1:-status}"; shift || true
@@ -797,6 +825,7 @@ case "${1:-}" in
               x_running || die "X is not running"; as_kiosk_x "${@:2}" ;;
     extension|ext) "${KIOSK_SYS}/apps/web/extensions.sh" "${@:2}" ;;
     update)   cmd_update ;;
+    hostname) cmd_hostname "${2:-}" ;;
     version)  cmd_version ;;
     -h|--help|help|"") cmd_help "${2:-}" ;;
     *) usage; exit 1 ;;
