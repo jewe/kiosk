@@ -30,6 +30,7 @@ Manual OS install without autoinstall: install Ubuntu Server, then run `bootstra
 | `bin/` | `kioskctl` |
 | `monitoring/` | collector, status, heartbeat |
 | `server/` | optional heartbeat receiver |
+| `tunnel/` | remote access: tunnel server setup (`server.sh`), port list, how to connect |
 | `tests/` | stress test, benchmarks, DevTools client |
 | `tools/` | dev-tools installer |
 | `branding/` | boot theme, backgrounds |

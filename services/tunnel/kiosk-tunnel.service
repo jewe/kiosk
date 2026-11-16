@@ -1,19 +1,24 @@
 [Unit]
-Description=Kiosk: reverse SSH tunnel (autossh)
+Description=Kiosk: reverse SSH tunnel
 After=network-online.target
 Wants=network-online.target
 StartLimitIntervalSec=0
 
+# Plain ssh, restarted by systemd with backoff (60 s growing to 10 min). No autossh: it retries a refused
+# login within a second, and 5 failures trip fail2ban on the server, which then bans the whole site's IP.
+# ServerAlive* ends a dead connection after ~90 s; ExitOnForwardFailure ends one whose port is still taken.
 [Service]
 EnvironmentFile=/opt/kiosk/state/tunnel.env
-Environment=AUTOSSH_GATETIME=0
-ExecStart=/usr/bin/autossh -M 0 -N \
+ExecStart=/usr/bin/ssh -N -T \
+    -o BatchMode=yes -o ConnectTimeout=20 \
     -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -o ExitOnForwardFailure=yes \
     -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/opt/kiosk/secrets/tunnel/known_hosts \
     -o IdentitiesOnly=yes -i /opt/kiosk/secrets/tunnel/id_ed25519 \
     -p ${TUNNEL_PORT} -R ${TUNNEL_REMOTE_PORT}:127.0.0.1:22 ${TUNNEL_USER}@${TUNNEL_HOST}
 Restart=always
-RestartSec=15
+RestartSec=60
+RestartSteps=4
+RestartMaxDelaySec=600
 
 [Install]
 WantedBy=multi-user.target
