@@ -6,6 +6,7 @@
 #   /opt/kiosk/state/chrome.env   CHROME_GPU=auto|software, CHROME_FLAGS="..."   (config: chrome.gpu / chrome.flags)
 #                                 CHROME_BROWSER=chrome|chromium (config: chrome.browser; read by the callers)
 #                                 CHROME_LANG=de|en-US|... (config: chrome.lang)
+#                                 CHROME_CACHE_BYTES (config: chrome.cache_size; used by launch.sh only, not by benchmarks)
 #   APP_EXTRA_FLAGS               per app (config: apps[].extra_flags)
 #   CHROME_EXTRA_FLAGS            environment, used by `bench.sh ab`
 # --enable-features= / --disable-features= from all sources are merged into one flag each

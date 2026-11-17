@@ -65,6 +65,9 @@ chrome:
   lang: ""                   # browser language, e.g. de or en-US: UI, navigator.language, Accept-Language. empty = system locale
   browser: chrome            # chrome (Google Chrome) | chromium (deb from the xtradeb PPA, installed by apply)
   gpu: auto                  # auto | software (--disable-gpu, only for broken drivers)
+  cache_size: 2G             # HTTP cache (videos, images, scripts) on the data volume, kept across restarts and
+                             # reboots; at most half the free space. 0 = cache in RAM, lost at every start.
+                             # Not used where /opt/kiosk is in RAM (persistence locked)
   flags: []                  # extra Chrome flags for every web/static app, e.g. ["--enable-features=Vulkan"]
   allowed_domains: []        # only these may be opened, e.g. [example.com, .api.example.org]; empty = no restriction.
                              # example.com includes subdomains, .example.com is this host only; 127.0.0.1 and

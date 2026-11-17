@@ -484,7 +484,18 @@ cmd_apply() {
     case "$cg" in auto|software) ;; *) warn "chrome.gpu must be auto or software"; cg=auto ;; esac
     local cl; cl="$(cfg '.chrome.lang')"
     [[ -z "$cl" || "$cl" =~ ^[a-z]{2,3}(-[A-Z]{2})?$ ]] || { warn "chrome.lang '$cl' is not a language tag, ignored"; cl=""; }
-    printf 'CHROME_GPU=%s\nCHROME_FLAGS="%s"\nCHROME_BROWSER=%s\nCHROME_LANG=%s\n' "$cg" "${cf//\"/\\\"}" "$(kiosk_browser)" "$cl" | write_file "${KIOSK_STATE}/chrome.env" 0644 || true
+    # chrome.cache_size → bytes; the cache folder belongs to the kiosk user (apps/web/launch.sh decides per start
+    # whether it is on a real disk). 0 removes the folder.
+    local cs cb=0; cs="$(cfg '.chrome.cache_size' 2G)"
+    case "$cs" in
+        0)            cb=0 ;;
+        [0-9]*[Mm])   cb=$(( 10#${cs%?} * 1048576 )) ;;
+        [0-9]*[Gg])   cb=$(( 10#${cs%?} * 1073741824 )) ;;
+        *)            warn "chrome.cache_size '$cs' is not like 500M or 4G, cache stays in RAM" ;;
+    esac
+    if [ "$cb" -gt 0 ]; then install -d -o "$KIOSK_USER" -g "$KIOSK_USER" -m 0750 "${KIOSK_DIR}/cache"
+    else rm -rf "${KIOSK_DIR}/cache"; fi
+    printf 'CHROME_GPU=%s\nCHROME_FLAGS="%s"\nCHROME_BROWSER=%s\nCHROME_LANG=%s\nCHROME_CACHE_BYTES=%s\n' "$cg" "${cf//\"/\\\"}" "$(kiosk_browser)" "$cl" "$cb" | write_file "${KIOSK_STATE}/chrome.env" 0644 || true
     if [ -f /etc/systemd/system/kiosk-web@.service ] || [ -f /etc/systemd/system/kiosk-static@.service ]; then
         # chrome.browser: install it on the first apply after a switch, move the policies to its directory
         "${KIOSK_SYS}/apps/web/browser.sh" ensure || { warn "browser '$(kiosk_browser)' is not ready"; problems=1; }
