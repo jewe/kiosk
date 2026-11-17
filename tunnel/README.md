@@ -41,8 +41,9 @@ One port per device, fixed. Convention: `kiosk-NN` → `200NN`; other names from
 |---|---|---|
 | kiosk-01 | 20001 | (not set up) |
 | kiosk-02 | 20002 | (not set up) |
-| kiosk-03 | 20003 | (not set up) |
+| kiosk-03 | 20003 | (not set up; the box became imaginamics-kiosk) |
 | wetho (Celeron N3000, was 192.168.10.80) | 20100 | 2026-11-16, verified: connect via jump, reboot → back in 61 s |
+| imaginamics-kiosk (i3-6100T Skylake, ex kiosk-03, 192.168.10.149) | 20101 | 2026-11-17, verified: connect via jump |
 
 ## Add a kiosk
 
