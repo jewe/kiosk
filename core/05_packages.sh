@@ -9,10 +9,11 @@ apt_install \
     pciutils usbutils lm-sensors lvm2 \
     htop nano less scrot \
     caja mate-terminal pluma eom udisks2 gvfs gvfs-backends gvfs-fuse mate-polkit \
-    network-manager rsync \
+    network-manager wpasupplicant iw rsync \
     pipewire pipewire-pulse wireplumber alsa-utils
 
-# NetworkManager handles WLAN later; keep netplan's ethernet config as is.
+# NetworkManager handles WLAN later (wpasupplicant: Ubuntu Server leaves it out on boxes without WLAN at install,
+# then a USB stick plugged in later stays "unavailable"); keep netplan's ethernet config as is.
 systemctl enable NetworkManager >/dev/null 2>&1 || true
 
 # pipewire runs as user services of the kiosk user; lingering keeps them alive without a login
